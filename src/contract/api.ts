@@ -17,7 +17,7 @@
 //   GET  /events       ?since=<ts> -> LoopEvent[]   (frontend polls every 2s)
 //   POST /issues                   { title, body } -> { issue_id }  (demo seed only)
 
-import type { Provenance } from "./events";
+import type { Provenance, PhaseName, PhaseStatus } from "./events";
 
 export interface Person {
   person_id: string;
@@ -52,6 +52,15 @@ export interface Plan {
   legacy_checklist: string[];
   test_strategy: string;
   assignee: { person_id: string; name: string; context_score: number; why: string };
+  recommended_tool?: { tool_name: string; why: string };
+}
+
+/** Projection of the phase state machine for one issue — GET /issues/:id/phases (Round 2). */
+export interface PhaseView {
+  issue_id: string;
+  phases: { phase: PhaseName; status: PhaseStatus; detail: string; updated_at: string }[];
+  merge_blocked: boolean;      // true unless all three phases are "passed"
+  blocking_reason: string | null;
 }
 
 export interface LoopEvent {

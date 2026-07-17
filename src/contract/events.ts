@@ -28,6 +28,8 @@ export type EventType =
   | "person.added"
   | "index.ready"
   | "profile.ready"
+  | "phase.updated"
+  | "tool.discovered"
   | "commit";
 
 /** The generic envelope every publish/subscribe uses. */
@@ -69,4 +71,24 @@ export interface PlanCreatedPayload {
 export interface RouteAssignedPayload {
   issue_id: string;
   assignee: { person_id: string; name: string; context_score: number; why: string };
+}
+
+/** Phase state machine — the projection over loop_events (Round 2, eng-a). */
+export type PhaseName = "planning" | "implementation" | "review";
+export type PhaseStatus = "pending" | "active" | "passed" | "failed";
+
+export interface PhaseUpdatedPayload {
+  issue_id: string;
+  phase: PhaseName;
+  status: PhaseStatus;
+  detail: string;
+}
+
+/** Zero.xyz discovered a specialized tool while planning a fix (Round 2, eng-a). */
+export interface ToolDiscoveredPayload {
+  issue_id: string;
+  plan_version: number;
+  tool_name: string;
+  why: string;
+  signal: string;
 }

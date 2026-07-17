@@ -40,6 +40,8 @@ export interface PlanRecord {
   legacy_checklist: string[];
   test_strategy: string;
   assignee: { person_id: string; context_score: number; why: string };
+  /** Optional specialized tool Zero.xyz discovered for this fix (Round 2, eng-a). */
+  recommended_tool?: { tool_name: string; why: string };
   created_at: string;
 }
 

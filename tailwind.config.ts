@@ -13,7 +13,29 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: [
+          "Inter",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica",
+          "Arial",
+          "sans-serif",
+        ],
+      },
       colors: {
+        gh: {
+          canvasInset: "hsl(var(--gh-canvas-inset))",
+          border: "hsl(var(--gh-border))",
+          borderMuted: "hsl(var(--gh-border-muted))",
+          fg: "hsl(var(--gh-fg-default))",
+          fgMuted: "hsl(var(--gh-fg-muted))",
+          success: "hsl(var(--gh-success))",
+          attention: "hsl(var(--gh-attention))",
+          neutralMuted: "hsl(var(--gh-neutral-muted))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

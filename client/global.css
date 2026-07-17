@@ -57,6 +57,16 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* GitHub Primer-inspired tokens (Agent Issue page) */
+    --gh-canvas-inset: 210 29% 97%;
+    --gh-border: 208 19% 85%;
+    --gh-border-muted: 208 19% 90%;
+    --gh-fg-default: 213 13% 14%;
+    --gh-fg-muted: 212 11% 39%;
+    --gh-success: 137 66% 30%;
+    --gh-attention: 40 100% 30%;
+    --gh-neutral-muted: 0 0% 74%;
   }
 
   .dark {

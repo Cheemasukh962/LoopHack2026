@@ -1,4 +1,5 @@
-# Keeper — LoopHack 2026
+# Compass — LoopHack 2026
+Goated PM
 
 An event-driven agent that turns **one** human-filed issue into a self-sustaining loop:
 **recall → plan → assign → implement → review → merge → scan → file its own next issues → repeat.**

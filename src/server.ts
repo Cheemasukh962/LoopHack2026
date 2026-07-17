@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response } from "express";
 
 import type { EventType, PersonRecord, PlanRecord, Store } from "./contract/index.js";
 import type { Gateway } from "./services/gateway.js";
+import { foldPhases } from "./services/phase-tracker.js";
 
 const personView = (person: PersonRecord) => ({
   person_id: person.person_id,
@@ -27,6 +28,7 @@ const planView = (plan: PlanRecord, store: Store) => {
     legacy_checklist: plan.legacy_checklist,
     test_strategy: plan.test_strategy,
     assignee: { ...plan.assignee, name: person?.name ?? plan.assignee.person_id },
+    ...(plan.recommended_tool ? { recommended_tool: plan.recommended_tool } : {}),
   };
 };
 
@@ -114,6 +116,10 @@ export const createServer = (store: Store, gateway: Gateway): Express => {
     const root = store.getIssue(req.params.id);
     if (!root) return respondIssueNotFound(res);
     return res.json({ root, children: root.children.map((childId) => store.getIssue(childId)).filter(Boolean) });
+  });
+  app.get("/api/v1/issues/:id/phases", (req, res) => {
+    if (!store.getIssue(req.params.id)) return respondIssueNotFound(res);
+    return res.json(foldPhases(store.getEvents(), req.params.id));
   });
   app.get("/api/v1/plans/:id", (req, res) => {
     const issuePlans = store.getIssues().flatMap((issue) => store.getPlans(issue.issue_id));

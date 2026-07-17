@@ -23,6 +23,9 @@ import { registerPlanner } from "./services/planner.js";
 import { registerDecomposer } from "./services/decomposer.js";
 import { makeLlm, makeGuard, makeZero } from "./integrations.js";
 
+// --- A round 2 (phase machine + self-correction) ---
+import { registerPhaseTracker } from "./services/phase-tracker.js";
+
 const hasLlmKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_BASE_URL);
 
 /**
@@ -90,8 +93,12 @@ async function main() {
   createLocateService({ bus, store, nexla }).start();
   createRouterService({ bus, store, nexla, guard }).start();
 
-  // C — brain & guardrails
-  registerPlanner({ bus, store, llm, nexla });
+  // A round 2 — phase state machine (register before planner so the ci.failed → failed
+  // transition is recorded before the planner's re-plan flips it back to active).
+  registerPhaseTracker({ bus, store });
+
+  // C — brain & guardrails (planner now discovers a Zero tool per fix — reuse the scanner's instance).
+  registerPlanner({ bus, store, llm, nexla, zero: tools });
   registerDecomposer({ bus, store, llm, guard });
 
   // A — the close (Loop 5)

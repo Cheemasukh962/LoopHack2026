@@ -31,8 +31,10 @@ export function makePomeriumGuard(store: Store, opts: GuardOptions = {}): Pomeri
       return false;
     };
 
-    // Boundary enforcement applies to real code/repo writes (not to filing an issue).
-    if (req.action === "branch" || req.action === "comment" || req.action === "assign") {
+    // File-boundary enforcement applies only to `branch` — the actual code write Keeper is
+    // constrained to. `assign` (choosing a person) and `comment` (posting the plan) are authz
+    // decisions we audit but do not path-gate: their scope is the issue/module, not a code write.
+    if (req.action === "branch") {
       const boundary = store.latestPlan(req.issue_id ?? "")?.file_boundary ?? [];
       const outside = req.scope.filter(p => !isWithinBoundary(p, boundary));
       if (outside.length > 0) return deny("boundary.violated", `outside file_boundary: ${outside.join(", ")}`);

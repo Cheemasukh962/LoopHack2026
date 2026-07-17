@@ -2,52 +2,113 @@ import seed from "./seed/seed.json";
 import { readFileSync } from "node:fs";
 
 import { InMemoryEventBus } from "./bus.js";
-import type { LlmClient, PomeriumGuard, ToolDiscovery } from "./contract/index.js";
-import { createServer } from "./server.js";
-import { createGateway } from "./services/gateway.js";
-import { registerScanner } from "./services/scanner.js";
 import { InMemoryStore } from "./store.js";
 import type { InMemoryStoreSeed } from "./store.js";
+import { createServer } from "./server.js";
+import type { LlmClient } from "./contract/index.js";
 
-const store = new InMemoryStore(seed as unknown as InMemoryStoreSeed);
-const bus = new InMemoryEventBus();
-const gateway = createGateway(bus, store);
-let filingsThisHour = 0;
+// --- A (spine + close) ---
+import { createGateway } from "./services/gateway.js";
+import { registerScanner } from "./services/scanner.js";
 
-const llm: LlmClient = {
-  complete: async () => "",
-  completeJson: async <T>() => ({
-    findings: [{
-      title: "Retry path has no explicit upstream timeout",
-      body: "The merged retry path can await a stalled checkout gateway indefinitely; add an explicit request deadline.",
-      paths: ["src/http/retry.ts"],
-    }],
-  } as T),
-};
-const guard: PomeriumGuard = {
-  authorizeWrite: async (request) => {
-    const allowed = request.action !== "file_issue" || filingsThisHour < 5;
-    if (allowed && request.action === "file_issue") filingsThisHour += 1;
-    store.appendEvent({
-      type: allowed ? "pomerium.authorized" : "pomerium.denied",
-      issue_id: request.issue_id ?? "",
-      provenance: "keeper",
-      payload: { ...request, filings_this_hour: filingsThisHour },
-    });
-    return allowed;
-  },
-};
-const tools: ToolDiscovery = {
-  discoverTool: async () => ({
-    tool_name: "terraform-risk-scanner",
-    why: "Terraform appears in the merged diff, so Keeper discovers an IaC scanner through Zero.xyz.",
-    run: async () => ({ findings: ["Terraform security group permits unrestricted egress; review the new network rule before it broadens production access."] }),
-  }),
-};
+// --- B (context & recall) ---
+import { createNexla } from "./nexla/index.js";
+import { createIngestService } from "./services/ingest.js";
+import { createRecallService } from "./services/recall.js";
+import { createLocateService } from "./services/locate.js";
+import { createRouterService } from "./services/router.js";
 
-const diff = readFileSync(new URL("./seed/staged-pr.diff", import.meta.url), "utf8");
-registerScanner(bus, store, { llm, guard, tools, stagedDiff: diff });
+// --- C (brain & guardrails) ---
+import { registerPlanner } from "./services/planner.js";
+import { registerDecomposer } from "./services/decomposer.js";
+import { makeLlm, makeGuard, makeZero } from "./integrations.js";
 
-const app = createServer(store, gateway);
-const port = Number(process.env.PORT ?? 8787);
-app.listen(port, () => console.log(`Keeper API listening on http://localhost:${port}/api/v1`));
+const hasLlmKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_BASE_URL);
+
+/**
+ * Prompt-aware canned LLM so the FULL loop runs end-to-end with no API key
+ * (offline dev + CI). When ANTHROPIC_API_KEY (or a Zero.xyz proxy) is set we use real Claude.
+ */
+function fallbackLlm(): LlmClient {
+  const arrAfter = (prompt: string, label: string): string[] => {
+    const m = prompt.match(new RegExp(`${label}\\s*(\\[[^\\]]*\\])`));
+    if (!m) return [];
+    try { return JSON.parse(m[1]); } catch { return []; }
+  };
+  const answer = (prompt: string): unknown => {
+    if (/post-merge risk scanner/i.test(prompt)) {
+      return { findings: [{
+        title: "Retry path has no explicit upstream timeout",
+        body: "The merged retry path can await a stalled checkout gateway indefinitely; add a per-attempt request deadline.",
+        paths: ["src/http/retry.ts"],
+      }] };
+    }
+    if (/Split this into/i.test(prompt)) {
+      const parent = arrAfter(prompt, "Parent file_boundary:");
+      const files = parent.length ? parent : ["src/http/retry.ts"];
+      return { children: files.slice(0, 3).map((f, i) => ({
+        title: `Sub-task ${i + 1}: scope ${f}`,
+        body: `Address the portion of the parent plan scoped to ${f}.`,
+        file_boundary: [f],
+      })) };
+    }
+    // planner (remediation plan)
+    const boundary = arrAfter(prompt, "Issue file boundary from locate:");
+    const fb = boundary.length ? boundary : ["src/http/retry.ts"];
+    return {
+      root_cause_hypothesis: "Upstream retry lacks a per-attempt timeout, so a stalled dependency exhausts the request budget.",
+      file_boundary: fb,
+      blast_radius: { call_sites: 3, services_affected: 1 },
+      legacy_checklist: ["Confirm no callers rely on unbounded retry"],
+      test_strategy: "Unit-test the timeout path; load-test to reproduce the intermittent 500s.",
+      too_large: fb.length > 5,
+    };
+  };
+  return {
+    complete: async () => "",
+    completeJson: async <T>(prompt: string) => answer(prompt) as T,
+  };
+}
+
+async function main() {
+  const store = new InMemoryStore(seed as unknown as InMemoryStoreSeed);
+  const bus = new InMemoryEventBus();
+
+  // Sponsor integrations (env-configured; safe to construct offline).
+  const guard = makeGuard(store);          // Pomerium: file boundary + <=5/hr filing cap + audit
+  const tools = makeZero(store);           // Zero.xyz: mid-loop tool discovery
+  const llm = hasLlmKey() ? makeLlm() : fallbackLlm();
+
+  const nexla = await createNexla();       // Nexla ownership + history
+
+  // A — spine
+  const gateway = createGateway(bus, store);
+
+  // B — context & recall
+  createIngestService({ bus, store, nexla }).start();
+  createRecallService({ bus, store, nexla }).start();
+  createLocateService({ bus, store, nexla }).start();
+  createRouterService({ bus, store, nexla, guard }).start();
+
+  // C — brain & guardrails
+  registerPlanner({ bus, store, llm, nexla });
+  registerDecomposer({ bus, store, llm, guard });
+
+  // A — the close (Loop 5)
+  const diff = readFileSync(new URL("./seed/staged-pr.diff", import.meta.url), "utf8");
+  registerScanner(bus, store, { llm, guard, tools, stagedDiff: diff });
+
+  const app = createServer(store, gateway);
+  const port = Number(process.env.PORT ?? 8787);
+  app.listen(port, () =>
+    console.log(
+      `Keeper API on http://localhost:${port}/api/v1  [llm=${hasLlmKey() ? "claude" : "fallback"}]\n` +
+      `Full loop wired: issue.created -> recall -> locate -> plan -> (decompose) -> route ; branch.merged -> scan -> file`,
+    ),
+  );
+}
+
+main().catch((err) => {
+  console.error("Keeper failed to boot:", err);
+  process.exit(1);
+});

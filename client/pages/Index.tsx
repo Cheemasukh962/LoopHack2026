@@ -1,125 +1,230 @@
-import { useState, type ReactNode } from "react";
-import { AlertTriangleIcon, CheckCircleGreenIcon, ChevronCollapseIcon, GearIcon, MergeBlockedIcon, PendingDotIcon } from "@/components/agent-issue/icons";
-import { Avatar, ActivityRow, TimelineItem } from "@/components/agent-issue/Timeline";
-import { Badge, ChecklistItem, CommentCard, InlineCode } from "@/components/agent-issue/CommentCard";
+import { Link } from "react-router-dom";
+import { KebabIcon, ReactionSmileyIcon } from "@/components/agent-issue/icons";
+import { Avatar } from "@/components/agent-issue/Timeline";
+import {
+  AgentPeopleIcon,
+  AskBubbleIcon,
+  ChevronDownIcon,
+  CommentBubblesIcon,
+  FilterLinesIcon,
+  OctocatIcon,
+  PlanDocIcon,
+  PlusIcon,
+  RepoBookIcon,
+  SendIcon,
+  SyncIcon,
+  TagIcon,
+  VerifiedBadgeIcon,
+} from "@/components/home/icons";
 
-const madeByOz = "https://api.builder.io/api/v1/image/assets/TEMP/90a99dd6e925502c62c330bbc0aeb14c37a274db?width=80";
-const avatarSmall = "https://api.builder.io/api/v1/image/assets/TEMP/fecad235da37f8620b01c6f99da56a2d0c511f22?width=40";
-const githubActions = "https://api.builder.io/api/v1/image/assets/TEMP/ed8da972cc7446bd1bee41db3083b348995617d4?width=80";
-const checkIcon = "https://api.builder.io/api/v1/image/assets/TEMP/b7181c122d914fe5de0b8c84cea316aff699540a?width=40";
-const vercelIcon = "https://api.builder.io/api/v1/image/assets/TEMP/635f7541144061997cb9791fae76374768f67998?width=40";
+const samuelAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/15a001fa0d049362b83ad86d84c419cbf69c3ee1?width=40";
+const steipeteAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/56f88fd013b2206bbafd10651c57cdab930977d0?width=80";
 
-function AssignedTo({ names }: { names: string[] }) {
+function Sidebar() {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="font-bold text-gh-fgMuted">Assigned to:</span>
-      {names.map((name) => (
-        <span key={name} className="inline-flex items-center gap-1 font-mono text-gh-fgMuted">
-          <Avatar src={avatarSmall} alt="Assigned user" size={20} />
-          {name}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function PlanSection({ title, assigned, children }: { title: string; assigned: string[]; children: ReactNode }) {
-  return (
-    <section>
-      <h3 className="text-[18px] font-semibold leading-6 tracking-[-0.02em] text-gh-fg">{title}</h3>
-      <div className="mt-2 rounded-md border border-gh-border bg-white p-3 shadow-[0_1px_1px_rgba(37,41,46,0.1),0_3px_6px_rgba(37,41,46,0.12)]">
-        <AssignedTo names={assigned} />
-        <div className="mt-1 text-sm leading-5 text-gh-fg">{children}</div>
-      </div>
-    </section>
-  );
-}
-
-function PlanningCard() {
-  return (
-    <CommentCard
-      author="agent"
-      action="created a full plan with development life cycle"
-      badges={<Badge>Bot</Badge>}
-      headerRight={<Badge>Contributor</Badge>}
-      showReaction
-    >
-      <div className="space-y-3">
-        <PlanSection title="Planning" assigned={["AI"]}>Lorem ipsum this is the review plan</PlanSection>
-        <PlanSection title="Implementation" assigned={["some human", "AI"]}>
-          <div className="space-y-1">
-            <div className="flex items-start gap-3"><span className="mt-1.5 h-3 w-3 flex-shrink-0 rounded-full bg-[#BDBDBD]" /><div><div className="text-base font-medium">Development</div><div className="text-sm text-gh-fgMuted">Some tagline here</div></div></div>
-            <div className="ml-[5px] h-7 w-0.5 bg-[#BDBDBD]" />
-            <div className="flex items-start gap-3"><span className="mt-1.5 h-3 w-3 flex-shrink-0 rounded-full bg-[#BDBDBD]" /><div><div className="text-base font-medium">Verification</div><div className="text-sm text-gh-fgMuted">Some tagline here</div></div></div>
+    <aside className="w-full flex-shrink-0 border-b border-gh-borderMuted bg-white lg:w-[336px] lg:border-b-0 lg:border-r">
+      <div className="flex flex-col items-start gap-6 p-4">
+        <button
+          type="button"
+          className="flex items-center gap-2 rounded-md border border-transparent px-3 py-2 hover:bg-gh-canvasInset"
+        >
+          <Avatar src={samuelAvatar} alt="samuelalake" size={20} />
+          <span className="text-sm font-medium text-[#25292E]">samuelalake</span>
+          <ChevronDownIcon />
+        </button>
+        <div className="flex w-full flex-col items-start gap-1 rounded-md bg-white p-2">
+          <h2 className="text-xl font-semibold text-gh-fg">Welcome</h2>
+          <p className="text-base leading-6 text-gh-fgMuted">
+            Connect your github and resume to see suggested tasks and plans for you to execute
+          </p>
+          <div className="flex flex-wrap items-center gap-3 pt-4">
+            <button
+              type="button"
+              className="rounded-md border border-[rgba(31,35,40,0.15)] bg-[#1F883D] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_1px_0_0_rgba(31,35,40,0.04)] hover:brightness-95"
+            >
+              Connect Github
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-[rgba(31,35,40,0.15)] bg-[#1F883D] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_1px_0_0_rgba(31,35,40,0.04)] hover:brightness-95"
+            >
+              Upload Resume
+            </button>
           </div>
-        </PlanSection>
-        <PlanSection title="Review" assigned={["some human", "AI"]}>Lorem ipsum this is the review plan</PlanSection>
+        </div>
       </div>
-    </CommentCard>
+    </aside>
   );
 }
 
-function CheckRow({ icon, label, pending = false, required = false }: { icon: string; label: string; pending?: boolean; required?: boolean }) {
+function Composer() {
   return (
-    <div className="flex min-w-0 items-center gap-2 border-b border-gh-borderMuted px-3 py-1.5 last:border-b-0">
-      {pending ? <PendingDotIcon className="h-4 w-4 flex-shrink-0" /> : <CheckCircleGreenIcon className="h-4 w-4 flex-shrink-0" />}
-      <img src={icon} alt="" className="h-5 w-5 flex-shrink-0 rounded shadow-[0_0_0_1px_rgba(31,35,40,0.15)]" />
-      <span className="min-w-0 flex-1 truncate text-sm text-gh-fg">{label}</span>
-      {required && <Badge>Required</Badge>}
-      <button type="button" aria-label="Check options" className="rounded-md p-1.5 hover:bg-black/5"><span className="text-base text-gh-fgMuted">•••</span></button>
+    <div className="w-full rounded-md border border-gh-borderMuted bg-white p-4 shadow-[0_1px_1px_rgba(31,35,40,0.04)]">
+      <input
+        type="text"
+        placeholder="Ask anything or type @ to add context"
+        className="w-full border-none bg-transparent text-base text-gh-fg placeholder:text-gh-fgMuted focus:outline-none"
+      />
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" className="flex items-center gap-1 rounded-md border border-gh-borderMuted px-3 py-1.5 text-sm font-medium text-[#25292E]">
+          <AskBubbleIcon />
+          Ask
+          <ChevronDownIcon />
+        </button>
+        <button type="button" className="flex items-center gap-1 rounded-md border border-gh-borderMuted px-3 py-1.5 text-sm font-medium text-[#25292E]">
+          <RepoBookIcon />
+          All repositories
+          <ChevronDownIcon />
+        </button>
+        <button type="button" aria-label="Add context" className="flex h-8 w-8 items-center justify-center rounded-md border border-[#D1D9E0] shadow-[0_1px_0_0_rgba(31,35,40,0.04)]">
+          <PlusIcon />
+        </button>
+        <div className="ml-auto flex items-center gap-1">
+          <button type="button" className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-gh-fg">
+            Auto
+            <ChevronDownIcon />
+          </button>
+          <button type="button" aria-label="Sync" className="flex h-8 w-8 items-center justify-center rounded-md">
+            <SyncIcon />
+          </button>
+          <span className="mx-1 h-6 w-px bg-gh-border" aria-hidden />
+          <button type="button" aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-md">
+            <SendIcon />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function MergeChecks() {
-  const [openPending, setOpenPending] = useState(true);
-  const [openSuccess, setOpenSuccess] = useState(true);
+function PillNav() {
   return (
-    <div className="overflow-hidden rounded-md border border-gh-border bg-white">
-      <div className="flex items-start gap-3 p-4">
-        <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#9A6700]"><AlertTriangleIcon /></span>
-        <div><h3 className="text-base font-semibold text-gh-fg">3 phases awaiting</h3><p className="text-sm text-gh-fgMuted">You need to complete all phases before you can merge</p></div>
-      </div>
-      <div className="border-t border-gh-borderMuted bg-gh-canvasInset px-2 py-2">
-        <button type="button" onClick={() => setOpenPending(!openPending)} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gh-fgMuted"><span>1 pending check</span><ChevronCollapseIcon className={openPending ? "rotate-180" : ""} /></button>
-        {openPending && <CheckRow icon={checkIcon} label="Review  Expected — Waiting for status to be reported" pending required />}
-        <button type="button" onClick={() => setOpenSuccess(!openSuccess)} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gh-fgMuted"><span>3 successful checks</span><ChevronCollapseIcon className={openSuccess ? "rotate-180" : ""} /></button>
-        {openSuccess && <div><CheckRow icon={checkIcon} label="Planning" /><CheckRow icon={checkIcon} label="Implementation" /><CheckRow icon={vercelIcon} label="Vercel" /></div>}
-      </div>
+    <div className="flex flex-wrap items-center justify-center gap-3">
+      <button type="button" className="flex items-center gap-2 rounded-xl border border-gh-borderMuted bg-white px-3 py-2 text-sm text-gh-fg shadow-[0_1px_1px_rgba(31,35,40,0.06)]">
+        <AgentPeopleIcon />
+        Agent
+      </button>
+      <button type="button" className="flex h-10 items-center gap-2 rounded-xl border border-gh-borderMuted bg-white px-4 text-sm text-gh-fg">
+        <PlanDocIcon />
+        Plan a session
+        <ChevronDownIcon />
+      </button>
     </div>
+  );
+}
+
+function FeedCard() {
+  return (
+    <article className="w-full rounded-md border border-gh-border bg-white p-2 shadow-[0_1px_1px_rgba(31,35,40,0.04),0_1px_2px_rgba(31,35,40,0.03)]">
+      <div className="flex flex-col gap-2 px-2 py-1 sm:px-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <div className="relative flex-shrink-0">
+              <Avatar src={steipeteAvatar} alt="samuel" size={40} />
+              <VerifiedBadgeIcon className="absolute -bottom-0.5 -right-0.5" />
+            </div>
+            <p className="text-sm">
+              <span className="font-semibold text-gh-fg">samuel is</span>{" "}
+              <span className="text-gh-fgMuted">planning</span>{" "}
+              <Link to="/issue" className="font-semibold text-gh-fg hover:underline">
+                xyz iss
+              </Link>
+            </p>
+          </div>
+          <button type="button" aria-label="More options" className="rounded-md p-1.5 hover:bg-black/5">
+            <KebabIcon />
+          </button>
+        </div>
+        <p className="pl-[52px] text-xs text-gh-fgMuted">13 minutes ago</p>
+
+        <div className="pt-2">
+          <Link to="/issue" className="text-xl font-semibold text-gh-fg hover:underline">
+            Title of the issue
+          </Link>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <span className="flex items-center gap-1.5 rounded-full bg-[#8250DF] px-3 py-1 text-xs font-medium text-white shadow-[0_0_0_1px_#8250DF_inset]">
+            <TagIcon />
+            Status
+          </span>
+          <span className="text-xs text-gh-fgMuted">status</span>
+        </div>
+
+        <div className="mt-2 rounded-[3px] bg-gh-canvasInset p-4">
+          <h3 className="border-b border-gh-borderMuted pb-1.5 text-[21px] font-semibold text-gh-fg">Headline</h3>
+          <p className="p-4 text-sm text-gh-fg">Lorem ipsum dolor sit amet</p>
+          <button type="button" className="px-0 text-sm font-semibold text-gh-fg underline">
+            Read more
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Add or remove reactions"
+              className="flex h-[26px] w-[26px] items-center justify-center rounded-full border border-gh-borderMuted bg-gh-canvasInset"
+            >
+              <ReactionSmileyIcon />
+            </button>
+            <button type="button" className="flex h-[26px] items-center gap-1.5 rounded-full border border-gh-border px-2 text-xs text-gh-fgMuted">
+              <span>👍</span>
+              <span>2</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-gh-fgMuted">
+            <CommentBubblesIcon />
+            5 comments
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function HomeFooter() {
+  const links = ["Terms", "Privacy", "Security", "Status", "Community", "Docs", "Contact", "Manage cookies"];
+  return (
+    <footer className="flex flex-col items-center gap-3 py-10 text-xs text-gh-fgMuted">
+      <div className="flex items-center gap-2">
+        <OctocatIcon />
+        <span>© 2026 GitHub, Inc.</span>
+      </div>
+      <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 px-4 text-center">
+        {links.map((label) => (
+          <button key={label} type="button" className="hover:underline">
+            {label}
+          </button>
+        ))}
+      </nav>
+    </footer>
   );
 }
 
 export default function Index() {
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-6 sm:px-8 lg:px-20 xl:px-24">
-      <div className="mb-5">
-        <h1 className="text-3xl font-normal leading-[48px] tracking-[-0.02em] text-gh-fg sm:text-[32px]">Agent Issue</h1>
-        <p className="text-xs text-gh-fgMuted"><span className="font-semibold">arturcraft</span> created 5 days ago</p>
-      </div>
-      <div className="mx-auto w-full max-w-[816px]">
-        <div className="mb-5 flex items-start gap-3">
-          <Avatar src={madeByOz} alt="madebyoz" size={40} />
-          <CommentCard author="madebyoz" action="kicked off a task" showReaction>
-            <h2 className="border-b border-gh-borderMuted pb-1.5 text-[21px] font-semibold text-gh-fg">Heading</h2>
-            <div className="space-y-5 pt-4 text-sm text-gh-fg">
-              <ChecklistItem label="New Icon" />
-              <div><h3 className="text-[18px] font-semibold">Description</h3><p className="mt-3">Added new <InlineCode>letter-spacing</InlineCode> icon.</p></div>
-              <div><h3 className="text-[18px] font-semibold">Icon use case</h3><p className="mt-3">It is used to adjust the spacing between characters, either increasing or decreasing the distance.</p></div>
-            </div>
-          </CommentCard>
+    <div className="flex w-full flex-col lg:flex-row">
+      <Sidebar />
+      <main className="mx-auto w-full max-w-[900px] flex-1 px-4 pb-4 pt-4 sm:px-8 lg:px-10">
+        <div className="flex flex-col gap-4">
+          <h1 className="text-2xl font-semibold text-gh-fg">Home</h1>
+          <Composer />
+          <PillNav />
+          <div className="flex items-center justify-between pt-2">
+            <h2 className="text-sm font-semibold text-gh-fg">Feed</h2>
+            <button type="button" className="flex items-center gap-1.5 rounded-md border border-[#D1D9E0] bg-[#F6F8FA] px-3 py-1.5 text-sm font-medium text-[#25292E]">
+              <FilterLinesIcon />
+              Filter
+            </button>
+          </div>
+          <FeedCard />
+          <button type="button" className="w-full rounded-md border border-gh-border bg-white py-2 text-sm font-semibold text-[#0969DA] hover:bg-gh-canvasInset">
+            More
+          </button>
         </div>
-        <div className="mb-5 space-y-1"><ActivityRow author="name" action="some activity that happened" commitLabel="some other activity that happened" commitHash="21af1fd" /></div>
-        <div className="mb-5 flex items-start gap-3">
-          <Avatar src={githubActions} alt="GitHub Actions" size={40} rounded="md" />
-          <PlanningCard />
-        </div>
-        <div className="mb-5 space-y-1"><ActivityRow author="name" action="some activity that happened" commitLabel="some other activity that happened" commitHash="21af1fd" /></div>
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-gh-fg"><MergeBlockedIcon /></div>
-          <div className="min-w-0 flex-1"><MergeChecks /></div>
-        </div>
-      </div>
-    </main>
+        <HomeFooter />
+      </main>
+    </div>
   );
 }

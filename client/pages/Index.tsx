@@ -1,4 +1,9 @@
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import type { FeedItem, User } from "@shared/api";
+import { getFeed, getMe } from "@/lib/api";
+import { timeAgo } from "@/lib/format";
+import { Skeleton } from "@/components/ui/skeleton";
 import { KebabIcon, ReactionSmileyIcon } from "@/components/agent-issue/icons";
 import { Avatar } from "@/components/agent-issue/Timeline";
 import {
@@ -17,10 +22,8 @@ import {
   VerifiedBadgeIcon,
 } from "@/components/home/icons";
 
-const samuelAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/15a001fa0d049362b83ad86d84c419cbf69c3ee1?width=40";
-const steipeteAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/56f88fd013b2206bbafd10651c57cdab930977d0?width=80";
-
 function Sidebar() {
+  const { data: user } = useQuery<User>({ queryKey: ["me"], queryFn: getMe });
   return (
     <aside className="w-full flex-shrink-0 border-b border-gh-borderMuted bg-white lg:w-[336px] lg:border-b-0 lg:border-r">
       <div className="flex flex-col items-start gap-6 p-4">
@@ -28,8 +31,8 @@ function Sidebar() {
           type="button"
           className="flex items-center gap-2 rounded-md border border-transparent px-3 py-2 hover:bg-gh-canvasInset"
         >
-          <Avatar src={samuelAvatar} alt="samuelalake" size={20} />
-          <span className="text-sm font-medium text-[#25292E]">samuelalake</span>
+          {user ? <Avatar src={user.avatar} alt={user.handle} size={20} /> : <Skeleton className="h-5 w-5 rounded-full" />}
+          <span className="text-sm font-medium text-[#25292E]">{user?.handle ?? "…"}</span>
           <ChevronDownIcon />
         </button>
         <div className="flex w-full flex-col items-start gap-1 rounded-md bg-white p-2">
@@ -42,13 +45,13 @@ function Sidebar() {
               type="button"
               className="rounded-md border border-[rgba(31,35,40,0.15)] bg-[#1F883D] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_1px_0_0_rgba(31,35,40,0.04)] hover:brightness-95"
             >
-              Connect Github
+              {user?.githubConnected ? "Github connected" : "Connect Github"}
             </button>
             <button
               type="button"
               className="rounded-md border border-[rgba(31,35,40,0.15)] bg-[#1F883D] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_1px_0_0_rgba(31,35,40,0.04)] hover:brightness-95"
             >
-              Upload Resume
+              {user?.resumeUploaded ? "Resume uploaded" : "Upload Resume"}
             </button>
           </div>
         </div>
@@ -113,21 +116,21 @@ function PillNav() {
   );
 }
 
-function FeedCard() {
+function FeedCard({ item }: { item: FeedItem }) {
   return (
     <article className="w-full rounded-md border border-gh-border bg-white p-2 shadow-[0_1px_1px_rgba(31,35,40,0.04),0_1px_2px_rgba(31,35,40,0.03)]">
       <div className="flex flex-col gap-2 px-2 py-1 sm:px-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-1 flex-wrap items-center gap-2">
             <div className="relative flex-shrink-0">
-              <Avatar src={steipeteAvatar} alt="samuel" size={40} />
-              <VerifiedBadgeIcon className="absolute -bottom-0.5 -right-0.5" />
+              <Avatar src={item.actor.avatar} alt={item.actor.name} size={40} />
+              {item.actor.verified && <VerifiedBadgeIcon className="absolute -bottom-0.5 -right-0.5" />}
             </div>
             <p className="text-sm">
-              <span className="font-semibold text-gh-fg">samuel is</span>{" "}
-              <span className="text-gh-fgMuted">planning</span>{" "}
-              <Link to="/issue" className="font-semibold text-gh-fg hover:underline">
-                xyz iss
+              <span className="font-semibold text-gh-fg">{item.actor.name} is</span>{" "}
+              <span className="text-gh-fgMuted">{item.action}</span>{" "}
+              <Link to={`/issue/${item.issueRef.id}`} className="font-semibold text-gh-fg hover:underline">
+                {item.issueRef.title}
               </Link>
             </p>
           </div>
@@ -135,28 +138,27 @@ function FeedCard() {
             <KebabIcon />
           </button>
         </div>
-        <p className="pl-[52px] text-xs text-gh-fgMuted">13 minutes ago</p>
+        <p className="pl-[52px] text-xs text-gh-fgMuted">{timeAgo(item.createdAtMs)}</p>
 
         <div className="pt-2">
-          <Link to="/issue" className="text-xl font-semibold text-gh-fg hover:underline">
-            Title of the issue
+          <Link to={`/issue/${item.id}`} className="text-xl font-semibold text-gh-fg hover:underline">
+            {item.issueRef.title}
           </Link>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <span className="flex items-center gap-1.5 rounded-full bg-[#8250DF] px-3 py-1 text-xs font-medium text-white shadow-[0_0_0_1px_#8250DF_inset]">
             <TagIcon />
-            Status
+            {item.status}
           </span>
-          <span className="text-xs text-gh-fgMuted">status</span>
         </div>
 
         <div className="mt-2 rounded-[3px] bg-gh-canvasInset p-4">
-          <h3 className="border-b border-gh-borderMuted pb-1.5 text-[21px] font-semibold text-gh-fg">Headline</h3>
-          <p className="p-4 text-sm text-gh-fg">Lorem ipsum dolor sit amet</p>
-          <button type="button" className="px-0 text-sm font-semibold text-gh-fg underline">
+          <h3 className="border-b border-gh-borderMuted pb-1.5 text-[21px] font-semibold text-gh-fg">{item.headline}</h3>
+          <p className="p-4 text-sm text-gh-fg">{item.excerpt}</p>
+          <Link to={`/issue/${item.id}`} className="px-0 text-sm font-semibold text-gh-fg underline">
             Read more
-          </button>
+          </Link>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
@@ -170,16 +172,43 @@ function FeedCard() {
             </button>
             <button type="button" className="flex h-[26px] items-center gap-1.5 rounded-full border border-gh-border px-2 text-xs text-gh-fgMuted">
               <span>👍</span>
-              <span>2</span>
+              <span>{item.reactions}</span>
             </button>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-gh-fgMuted">
             <CommentBubblesIcon />
-            5 comments
+            {item.comments} comments
           </div>
         </div>
       </div>
     </article>
+  );
+}
+
+function FeedList() {
+  const { data: items, isLoading, isError } = useQuery<FeedItem[]>({ queryKey: ["feed"], queryFn: getFeed });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-4">
+        {[0, 1].map((i) => (
+          <Skeleton key={i} className="h-48 w-full rounded-md" />
+        ))}
+      </div>
+    );
+  }
+  if (isError) {
+    return <p className="rounded-md border border-gh-border bg-white p-4 text-sm text-gh-fgMuted">Couldn’t load the feed. Is the API server running?</p>;
+  }
+  if (!items || items.length === 0) {
+    return <p className="rounded-md border border-gh-border bg-white p-4 text-sm text-gh-fgMuted">No activity yet.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {items.map((item) => (
+        <FeedCard key={item.id} item={item} />
+      ))}
+    </div>
   );
 }
 
@@ -218,7 +247,7 @@ export default function Index() {
               Filter
             </button>
           </div>
-          <FeedCard />
+          <FeedList />
           <button type="button" className="w-full rounded-md border border-gh-border bg-white py-2 text-sm font-semibold text-[#0969DA] hover:bg-gh-canvasInset">
             More
           </button>

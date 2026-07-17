@@ -2,6 +2,9 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
+import { handleMe } from "./routes/me";
+import { handleFeed } from "./routes/feed";
+import { handleIssue } from "./routes/issues";
 
 export function createServer() {
   const app = express();
@@ -18,6 +21,11 @@ export function createServer() {
   });
 
   app.get("/api/demo", handleDemo);
+
+  // Frontend-wiring endpoints (see shared/api.ts for the response shapes).
+  app.get("/api/me", handleMe);
+  app.get("/api/feed", handleFeed);
+  app.get("/api/issues/:id", handleIssue);
 
   return app;
 }

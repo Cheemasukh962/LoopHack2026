@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { keeper, seedDemoIssue, DEMO_FEATURE_ID } from "@/lib/keeper";
 import { KebabIcon, ReactionSmileyIcon } from "@/components/agent-issue/icons";
 import { Avatar } from "@/components/agent-issue/Timeline";
 import {
@@ -14,11 +16,9 @@ import {
   SendIcon,
   SyncIcon,
   TagIcon,
-  VerifiedBadgeIcon,
 } from "@/components/home/icons";
 
 const samuelAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/15a001fa0d049362b83ad86d84c419cbf69c3ee1?width=40";
-const steipeteAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/56f88fd013b2206bbafd10651c57cdab930977d0?width=80";
 
 function Sidebar() {
   return (
@@ -58,12 +58,50 @@ function Sidebar() {
 }
 
 function Composer() {
+  const navigate = useNavigate();
+  const [value, setValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const canSubmit = value.trim().length > 0 && !submitting;
+
+  async function submit() {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      // First line becomes the title, the rest becomes the body.
+      const [title, ...rest] = value.trim().split("\n");
+      const { issue_id } = await keeper.createIssue({
+        title,
+        body: rest.join("\n").trim(),
+      });
+      navigate(`/issue/${issue_id}`);
+    } catch (err) {
+      console.error("Failed to create issue", err);
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className="w-full rounded-md border border-gh-borderMuted bg-white p-4 shadow-[0_1px_1px_rgba(31,35,40,0.04)]">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="w-full rounded-md border border-gh-borderMuted bg-white p-4 shadow-[0_1px_1px_rgba(31,35,40,0.04)]"
+    >
       <input
         type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+        disabled={submitting}
         placeholder="Ask anything or type @ to add context"
-        className="w-full border-none bg-transparent text-base text-gh-fg placeholder:text-gh-fgMuted focus:outline-none"
+        className="w-full border-none bg-transparent text-base text-gh-fg placeholder:text-gh-fgMuted focus:outline-none disabled:opacity-60"
       />
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" className="flex items-center gap-1 rounded-md border border-gh-borderMuted px-3 py-1.5 text-sm font-medium text-[#25292E]">
@@ -88,12 +126,17 @@ function Composer() {
             <SyncIcon />
           </button>
           <span className="mx-1 h-6 w-px bg-gh-border" aria-hidden />
-          <button type="button" aria-label="Send" className="flex h-8 w-8 items-center justify-center rounded-md">
+          <button
+            type="submit"
+            aria-label="Send"
+            disabled={!canSubmit}
+            className="flex h-8 w-8 items-center justify-center rounded-md enabled:hover:bg-gh-canvasInset disabled:cursor-not-allowed disabled:opacity-40"
+          >
             <SendIcon />
           </button>
         </div>
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -113,50 +156,52 @@ function PillNav() {
   );
 }
 
+// A feature request Keeper has already built, assigned to you to review.
+// This is the reviewer entry point — clicking through opens the issue at the
+// "Start human review" state.
 function FeedCard() {
+  const to = `/issue/${DEMO_FEATURE_ID}`;
   return (
     <article className="w-full rounded-md border border-gh-border bg-white p-2 shadow-[0_1px_1px_rgba(31,35,40,0.04),0_1px_2px_rgba(31,35,40,0.03)]">
       <div className="flex flex-col gap-2 px-2 py-1 sm:px-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex flex-1 flex-wrap items-center gap-2">
-            <div className="relative flex-shrink-0">
-              <Avatar src={steipeteAvatar} alt="samuel" size={40} />
-              <VerifiedBadgeIcon className="absolute -bottom-0.5 -right-0.5" />
-            </div>
+            <Avatar src={samuelAvatar} alt="samuelalake" size={40} />
             <p className="text-sm">
-              <span className="font-semibold text-gh-fg">samuel is</span>{" "}
-              <span className="text-gh-fgMuted">planning</span>{" "}
-              <Link to="/issue" className="font-semibold text-gh-fg hover:underline">
-                xyz iss
-              </Link>
+              <span className="font-semibold text-gh-fg">Compass</span>{" "}
+              <span className="text-gh-fgMuted">assigned</span>{" "}
+              <span className="font-semibold text-gh-fg">you</span>{" "}
+              <span className="text-gh-fgMuted">to review a feature request</span>
             </p>
           </div>
           <button type="button" aria-label="More options" className="rounded-md p-1.5 hover:bg-black/5">
             <KebabIcon />
           </button>
         </div>
-        <p className="pl-[52px] text-xs text-gh-fgMuted">13 minutes ago</p>
+        <p className="pl-[52px] text-xs text-gh-fgMuted">2 hours ago</p>
 
         <div className="pt-2">
-          <Link to="/issue" className="text-xl font-semibold text-gh-fg hover:underline">
-            Title of the issue
+          <Link to={to} className="text-xl font-semibold text-gh-fg hover:underline">
+            Add CSV export to the analytics dashboard
           </Link>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
-          <span className="flex items-center gap-1.5 rounded-full bg-[#8250DF] px-3 py-1 text-xs font-medium text-white shadow-[0_0_0_1px_#8250DF_inset]">
+          <span className="flex items-center gap-1.5 rounded-full bg-[#0969DA] px-3 py-1 text-xs font-medium text-white shadow-[0_0_0_1px_#0969DA_inset]">
             <TagIcon />
-            Status
+            Needs your review
           </span>
-          <span className="text-xs text-gh-fgMuted">status</span>
+          <span className="text-xs text-gh-fgMuted">Requested by priyacodes · built by Compass</span>
         </div>
 
         <div className="mt-2 rounded-[3px] bg-gh-canvasInset p-4">
-          <h3 className="border-b border-gh-borderMuted pb-1.5 text-[21px] font-semibold text-gh-fg">Headline</h3>
-          <p className="p-4 text-sm text-gh-fg">Lorem ipsum dolor sit amet</p>
-          <button type="button" className="px-0 text-sm font-semibold text-gh-fg underline">
-            Read more
-          </button>
+          <p className="text-sm text-gh-fg">
+            As an analyst, I want to export the current dashboard view to CSV so I can share numbers with teammates who
+            don't use the tool. The export should respect the active filters.
+          </p>
+          <Link to={to} className="mt-3 inline-block text-sm font-semibold text-[#0969DA] hover:underline">
+            Start review →
+          </Link>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
@@ -175,7 +220,7 @@ function FeedCard() {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-gh-fgMuted">
             <CommentBubblesIcon />
-            5 comments
+            3 comments
           </div>
         </div>
       </div>
@@ -203,6 +248,11 @@ function HomeFooter() {
 }
 
 export default function Index() {
+  // Ensure the review-ready feature exists so the feed card opens straight onto it.
+  useEffect(() => {
+    seedDemoIssue();
+  }, []);
+
   return (
     <div className="flex w-full flex-col lg:flex-row">
       <Sidebar />

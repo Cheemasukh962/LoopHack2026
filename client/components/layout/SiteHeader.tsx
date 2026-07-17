@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
 import { SunIcon } from "@/components/agent-issue/icons";
+import { CompassLogo } from "@/components/CompassLogo";
 
 export default function SiteHeader() {
   return (
     <header className="w-full min-w-0 border-b border-gh-border bg-gh-canvasInset">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-4 sm:px-8">
+      <div className="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-8">
         <Link
           to="/"
-          className="flex-1 truncate text-sm font-semibold text-gh-fg hover:opacity-80"
+          className="flex items-center gap-2 text-sm font-semibold text-gh-fg hover:opacity-80"
         >
-          Harness Agent
+          <CompassLogo size={24} />
+          Compass
         </Link>
         <div className="flex items-center gap-2">
           <button

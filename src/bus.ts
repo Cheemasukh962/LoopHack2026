@@ -10,7 +10,11 @@ export class InMemoryEventBus implements EventBus {
     queueMicrotask(() => {
       const handlers = [...(this.handlers.get(event.type) ?? [])];
       console.info(`[bus] ${event.type}`, event.issue_id ?? event.payload.issue_id ?? "");
-      void Promise.all(handlers.map((handler) => handler(event)));
+      for (const handler of handlers) {
+        void Promise.resolve()
+          .then(() => handler(event))
+          .catch((error: unknown) => console.error(`[bus] subscriber failed for ${event.type}`, error));
+      }
     });
   }
 

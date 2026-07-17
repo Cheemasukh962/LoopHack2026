@@ -77,6 +77,23 @@ test("dispatches subscribed events and preserves append-only trace order", async
   assert.deepEqual(store.getEvents().map((event) => event.type), ["issue.created", "plan.created"]);
 });
 
+test("continues dispatching when an earlier subscriber throws", async () => {
+  const bus = new InMemoryEventBus();
+  const seen: string[] = [];
+
+  bus.subscribe("issue.created", () => {
+    throw new Error("first subscriber failed");
+  });
+  bus.subscribe("issue.created", () => {
+    seen.push("second subscriber ran");
+  });
+
+  bus.publish({ type: "issue.created", payload: { issue_id: "ISS-2" } });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(seen, ["second subscriber ran"]);
+});
+
 test("seeds and retrieves people, issues, versioned plans, and branches", () => {
   const store = new InMemoryStore({ people: [person], issues: [issue], plans: [plan], branches: [branch] });
 

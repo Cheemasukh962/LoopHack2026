@@ -17,6 +17,7 @@
 // The point: git blame outranks the résumé. A résumé claim must never beat real blame.
 
 import type { NexlaContext } from "../contract";
+import { NexlaClient } from "./client.js";
 
 // ---- Nexset row shapes (the "same shape" a Nexla Nexset would hand back) ----------------
 
@@ -271,11 +272,27 @@ export class LocalNexla implements NexlaContext {
 }
 
 /**
- * Build the Nexla context layer. Attempts Nexla MCP/REST first (unwired in this fallback),
- * then serves the local Nexsets. Kept async so the real MCP handshake slots in unchanged.
+ * Build the Nexla context layer. When NEXLA_API_KEY is set we authenticate against the real
+ * Nexla API with the service key (proving the sponsor integration is live), then serve the
+ * ownership/history data from the identical-shape local Nexsets. Once the account's Nexset ids
+ * are provided (NEXLA_OWNERSHIP_NEXSET etc.), swap client.queryNexset() in per method — nothing
+ * downstream changes because the shapes match. Auth is non-blocking so boot is never delayed,
+ * and any failure degrades cleanly to the local Nexsets.
  */
 export async function createNexla(): Promise<LocalNexla> {
-  // TODO(nexla-mcp): if process.env.NEXLA_API_KEY / MCP endpoint is present, back these
-  // Nexsets with live Nexla calls. Same shapes, so nothing downstream changes.
-  return new LocalNexla();
+  const local = new LocalNexla();
+  const apiKey = process.env.NEXLA_API_KEY;
+  if (apiKey) {
+    const client = new NexlaClient({ apiKey, apiUrl: process.env.NEXLA_API_URL });
+    void client.authenticate().then((auth) => {
+      console.info(
+        auth.ok
+          ? "[nexla] service key authenticated (live) — serving Nexsets locally until Nexset ids are configured"
+          : `[nexla] live auth unavailable (${auth.detail}) — using local Nexsets`,
+      );
+    });
+  } else {
+    console.info("[nexla] no NEXLA_API_KEY — using local Nexsets");
+  }
+  return local;
 }

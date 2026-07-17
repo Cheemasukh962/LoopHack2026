@@ -21,7 +21,9 @@ human. This is the beat that turns "an app" into *loop engineering*. Make it leg
      `ci.failed` → implementation phase flips to **failed** (error state).
   3. **Self-correction** — the subsequent `plan.revised` event + new plan version appears and the
      implementation phase returns to **active**, all from the same `useEvents(id)` / `usePhases(id)`
-     poll. **No page reload, no human.** Call this out visually — it's handoff §8.4.
+     poll. **No page reload, no human.** Call this out visually — it's handoff §8.4. When the re-plan
+     carries a `tool.discovered` event (Zero sponsor), surface it as the fix: "🧰 Keeper pulled in
+     **{tool_name}** to fix it — {why}." That is Zero powering the self-correction, live on stage.
 - `client/components/execution/*` — **NEW dir.** Any presentational subcomponents you need
   (ExecutionHeader, CiStatusBanner, RePlanCard, …). All new files, zero conflict with B.
 

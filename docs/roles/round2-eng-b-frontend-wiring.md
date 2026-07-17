@@ -27,7 +27,8 @@ real. React Query + `QueryClientProvider` are already wired in `client/App.tsx`.
   (`human_filed` vs `keeper_filed`). Connect/Upload buttons may stay visual-only if time-short.
 - `client/pages/AgentIssue.tsx` — header + kickoff from `useIssue(id)`; timeline comment cards from
   `useEvents(id)` mapped per handoff §4 table (recall.hit "#412", route.assigned "Assigned Marco —
-  blame > résumé", plan.created, scan.found …). Drive `PlanningCard` section status and the
+  blame > résumé", plan.created, scan.found …), **plus a `tool.discovered` card** (Zero sponsor):
+  "🧰 Zero discovered a tool — **{tool_name}**: {why}." Drive `PlanningCard` section status and the
   `MergeChecks` gate from `usePhases(id)` — gate locked until `merge_blocked` is false.
 
 ## Files you IMPORT but never edit

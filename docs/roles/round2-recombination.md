@@ -14,8 +14,8 @@ clean fast-forward-ish merge, not a conflict-resolution session. Master spec is
 ## Ownership matrix (who edits what — no file appears twice)
 | Path | Owner |
 |---|---|
-| `src/contract/events.ts` (+`phase.updated`), `src/contract/api.ts` (`PhaseView`) | **A** |
-| `src/services/phase-tracker.ts`, `src/server.ts`, `src/index.ts` | **A** |
+| `src/contract/events.ts` (+`phase.updated`, +`tool.discovered`), `src/contract/api.ts` (`PhaseView`, `Plan.recommended_tool?`) | **A** |
+| `src/services/phase-tracker.ts`, `src/services/planner.ts` (Zero wiring), `src/server.ts`, `src/index.ts` | **A** |
 | `client/lib/keeper.ts`, `client/lib/phases.ts` | **B** |
 | `client/pages/Index.tsx`, `client/pages/AgentIssue.tsx` | **B** |
 | `client/App.tsx`, `client/pages/Execution.tsx`, `client/components/execution/*` | **C** |
@@ -30,6 +30,9 @@ lib; C owns routing + the new page + new components). The only coupling is that 
    fallback with one line. Same rules table: handoff §5.2.
 2. **`client/lib/keeper.ts` hook signatures** — B defines them (`useCreateIssue`, `useIssues`,
    `useIssue`, `useEvents`, `useStats`, `usePhases`, `useTriggerCi`). C builds Screen 3 against these.
+3. **`tool.discovered` payload + `Plan.recommended_tool?`** — A defines it (Zero tool-discovery in
+   planning); B renders the Issue-timeline card, C renders it in the Screen 3 re-plan beat. The Zero
+   sponsor gets a visible on-screen moment in both the plan and the self-correction.
 
 ## Recombination order
 1. **Backend:** merge `eng-a-backend-phases` → `mainbackend`. Gate: `npm run dev` boots, 37/37 + new

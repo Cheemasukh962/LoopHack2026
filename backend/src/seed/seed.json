@@ -1,0 +1,95 @@
+{
+  "people": [
+    {
+      "person_id": "person_dana",
+      "name": "Dana Ibrahim",
+      "github_handle": "dana-ibrahim",
+      "email": "dana@keeper.dev",
+      "resume_s3_key": "resumes/dana-ibrahim.pdf",
+      "resume_parsed": { "skills": ["TypeScript", "distributed systems", "incident response"], "stacks": ["Node.js", "Express", "PostgreSQL"], "years_per_stack": { "Node.js": 7, "TypeScript": 6 } },
+      "external_github": { "langs": ["TypeScript", "Go"], "repo_count": 31, "top_stacks": ["Node.js", "OpenTelemetry"] },
+      "repo_commits": 428,
+      "context_scores": { "src/http/": 0.98, "src/checkout/": 0.84 },
+      "cold_start": false
+    },
+    {
+      "person_id": "person_marco",
+      "name": "Marco Chen",
+      "github_handle": "marcochen",
+      "email": "marco@keeper.dev",
+      "resume_s3_key": "resumes/marco-chen.pdf",
+      "resume_parsed": { "skills": ["security", "authentication", "OAuth"], "stacks": ["Node.js", "Redis", "Terraform"], "years_per_stack": { "Node.js": 5, "Terraform": 3 } },
+      "external_github": { "langs": ["TypeScript", "HCL"], "repo_count": 19, "top_stacks": ["OIDC", "Terraform"] },
+      "repo_commits": 311,
+      "context_scores": { "src/auth/": 0.97, "infra/": 0.72 },
+      "cold_start": false
+    },
+    {
+      "person_id": "person_priya",
+      "name": "Priya Nair",
+      "github_handle": "priyanair",
+      "email": "priya@keeper.dev",
+      "resume_s3_key": "resumes/priya-nair.pdf",
+      "resume_parsed": { "skills": ["SRE", "Terraform", "AWS"], "stacks": ["Terraform", "ECS", "CloudWatch"], "years_per_stack": { "Terraform": 6, "AWS": 7 } },
+      "external_github": { "langs": ["HCL", "Python"], "repo_count": 27, "top_stacks": ["AWS", "Kubernetes"] },
+      "repo_commits": 276,
+      "context_scores": { "infra/": 0.99, ".github/": 0.76 },
+      "cold_start": false
+    },
+    {
+      "person_id": "person_leo",
+      "name": "Leo Martin",
+      "github_handle": "leomartin",
+      "email": "leo@keeper.dev",
+      "resume_s3_key": "resumes/leo-martin.pdf",
+      "resume_parsed": { "skills": ["React", "accessibility", "product analytics"], "stacks": ["React", "Vite", "Playwright"], "years_per_stack": { "React": 4, "Playwright": 2 } },
+      "external_github": { "langs": ["TypeScript", "CSS"], "repo_count": 14, "top_stacks": ["React", "Testing Library"] },
+      "repo_commits": 163,
+      "context_scores": { "web/": 0.95, "src/checkout/": 0.58 },
+      "cold_start": false
+    }
+  ],
+  "issues": [
+    { "issue_id": "ISS-412", "title": "Retries surface a ghost 500 after ECONNRESET", "body": "Checkout retries a reset payment-gateway connection but loses the original response context. The incident review found three retries clustered around a deploy.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-412-classify-econnreset", "created_at": "2024-01-18T16:23:00.000Z" },
+    { "issue_id": "ISS-417", "title": "Session renewal races logout in a second browser tab", "body": "A stale refresh response can recreate a cookie after the user explicitly signs out. Resolved by binding renewal to the session version in src/auth/session.ts.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-417-session-version", "created_at": "2024-02-02T10:12:00.000Z" },
+    { "issue_id": "ISS-421", "title": "Webhook replay duplicates fulfillment notifications", "body": "The provider retried a delivery after our 502 and fulfillment sent a second customer email. Added delivery-id persistence before dispatch.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-421-webhook-idempotency", "created_at": "2024-02-16T14:46:00.000Z" },
+    { "issue_id": "ISS-426", "title": "Redis security group lacks a documented egress exception", "body": "Production Redis could only be reached because the broad application egress rule masked the intended boundary. Narrowed the Terraform rule and documented the service CIDR.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "infra/ISS-426-redis-egress", "created_at": "2024-03-01T09:35:00.000Z" },
+    { "issue_id": "ISS-433", "title": "Checkout trace omits upstream request id", "body": "On-call could not correlate a 502 to the gateway logs. The HTTP client now carries x-request-id into structured retry logs.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-433-request-id", "created_at": "2024-03-22T18:01:00.000Z" },
+    { "issue_id": "ISS-439", "title": "Password reset tokens remain usable after a password change", "body": "Changing a password did not revoke an earlier reset token. Fixed by comparing token session_version to the current account session.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-439-revoke-reset", "created_at": "2024-04-03T13:18:00.000Z" },
+    { "issue_id": "ISS-445", "title": "Retry backoff ignores Retry-After from rate-limited gateway", "body": "The payment gateway returned 429 with Retry-After, but src/http/retry.ts immediately retried and amplified the rate limit. Resolved with capped server-directed backoff.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-445-retry-after", "created_at": "2024-04-19T11:29:00.000Z" },
+    { "issue_id": "ISS-452", "title": "Staging task role can read production parameter path", "body": "A copied IAM path wildcard crossed environments. The Terraform module now receives an environment-scoped parameter prefix.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "infra/ISS-452-parameter-scope", "created_at": "2024-05-06T15:54:00.000Z" },
+    { "issue_id": "ISS-460", "title": "Cart reservation expiry is not idempotent", "body": "Two queue deliveries decrement inventory twice when a reservation expires. The worker now records the transition before stock adjustment.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-460-reservation-transition", "created_at": "2024-05-24T08:41:00.000Z" },
+    { "issue_id": "ISS-467", "title": "Admin audit export leaks internal session id", "body": "The CSV export included a session identifier that should not leave the control plane. Removed the field and added a column allowlist test.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-467-audit-export", "created_at": "2024-06-11T17:08:00.000Z" },
+    { "issue_id": "ISS-474", "title": "Canary health check retries indefinitely during DNS outage", "body": "A failed resolver lookup did not consume the retry budget, leaving a deploy in canary forever. Counted DNS failures and added an explicit deadline.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-474-dns-deadline", "created_at": "2024-06-28T12:16:00.000Z" },
+    { "issue_id": "ISS-481", "title": "OIDC callback accepts an already-consumed state nonce", "body": "Parallel callbacks could validate the same nonce before deletion. Replaced read/delete with an atomic consume operation in src/auth/session.ts.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-481-consume-nonce", "created_at": "2024-07-12T19:04:00.000Z" },
+    { "issue_id": "ISS-489", "title": "Receipt worker retries permanently invalid address payloads", "body": "A 400 from the mailing API was retried as a transport error. The classifier now marks provider validation failures as terminal.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-489-terminal-400", "created_at": "2024-08-02T09:57:00.000Z" },
+    { "issue_id": "ISS-496", "title": "Terraform plan permits public ingress to debug metrics", "body": "An example CIDR was copied into the shared module. Replaced the public ingress with the observability security-group reference.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "infra/ISS-496-metrics-ingress", "created_at": "2024-08-23T16:38:00.000Z" },
+    { "issue_id": "ISS-503", "title": "Checkout gives up before the gateway's documented SLA", "body": "The client timeout was 800ms while the provider SLA allows 1.5 seconds. Tuned the first attempt while preserving the overall request budget.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-503-checkout-budget", "created_at": "2024-09-10T10:22:00.000Z" },
+    { "issue_id": "ISS-507", "title": "Order confirmation can outlive a cancelled checkout", "body": "The confirmation job did not check the checkout cancellation marker. Added a final state read immediately before sending email.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-507-confirmation-state", "created_at": "2024-09-26T14:13:00.000Z" },
+    { "issue_id": "ISS-514", "title": "Refresh token key rotation drops sessions during regional failover", "body": "One region cached only the newest signing key. The verifier now keeps the active and previous kid until the grace period expires.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-514-refresh-keyset", "created_at": "2024-10-18T11:48:00.000Z" },
+    { "issue_id": "ISS-521", "title": "Worker deploy rolls back when image digest is unavailable", "body": "The deployer treated a temporary registry lookup error as an invalid immutable digest. Retried the lookup with the deployment deadline.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-521-registry-retry", "created_at": "2024-11-07T07:31:00.000Z" },
+    { "issue_id": "ISS-529", "title": "Saved card webhook retries cross the customer boundary", "body": "A reused job object retained a previous customer id after a retry. The queue payload is now reconstructed from immutable event data.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "fix/ISS-529-immutable-webhook", "created_at": "2024-11-29T18:07:00.000Z" },
+    { "issue_id": "ISS-536", "title": "CloudWatch alarm does not page for sustained checkout 5xx", "body": "The alarm evaluated a sparse metric as missing rather than breaching. Updated the Terraform alarm to treat missing data as breaching for checkout failures.", "state": "closed", "provenance": "human", "parent_issue": null, "children": [], "branch": "infra/ISS-536-checkout-alarm", "created_at": "2024-12-17T15:42:00.000Z" }
+  ],
+  "plans": [
+    {
+      "plan_id": "plan_ISS-412_v1",
+      "issue_id": "ISS-412",
+      "version": 1,
+      "revised_because": null,
+      "prior_art": [],
+      "root_cause_hypothesis": "ECONNRESET was retried without preserving provider context.",
+      "file_boundary": ["src/http/retry.ts", "src/checkout/gateway.ts"],
+      "blast_radius": { "call_sites": 4, "services_affected": 2 },
+      "legacy_checklist": ["Keep Retry-After behavior", "Preserve idempotency key"],
+      "test_strategy": "Simulate a reset connection and assert context survives the retry.",
+      "assignee": { "person_id": "person_dana", "context_score": 0.98, "why": "Primary maintainer for the HTTP retry client." },
+      "created_at": "2024-01-18T17:03:00.000Z"
+    }
+  ],
+  "branches": [
+    { "branch_name": "fix/ISS-412-classify-econnreset", "issue_id": "ISS-412", "plan_version": 1, "file_boundary": ["src/http/retry.ts", "src/checkout/gateway.ts"], "state": "merged", "base_sha": "0e50e45", "opened_at": "2024-01-18T17:20:00.000Z" },
+    { "branch_name": "fix/ISS-445-retry-after", "issue_id": "ISS-445", "plan_version": 1, "file_boundary": ["src/http/retry.ts"], "state": "merged", "base_sha": "4eb4f6d", "opened_at": "2024-04-19T12:01:00.000Z" },
+    { "branch_name": "infra/ISS-496-metrics-ingress", "issue_id": "ISS-496", "plan_version": 1, "file_boundary": ["infra/main.tf"], "state": "merged", "base_sha": "9f1a2cd", "opened_at": "2024-08-23T17:03:00.000Z" }
+  ]
+}

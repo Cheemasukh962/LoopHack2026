@@ -25,3 +25,9 @@ dist-ssr
 
 .config/
 !.env
+
+# Backend (merged-in engine) — never commit secrets/caches
+backend/.env
+backend/node_modules
+backend/dist
+backend/.cache

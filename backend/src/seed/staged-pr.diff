@@ -1,0 +1,49 @@
+diff --git a/src/http/retry.ts b/src/http/retry.ts
+index 1aab3f2..8b0d6e9 100644
+--- a/src/http/retry.ts
++++ b/src/http/retry.ts
+@@ -1,16 +1,27 @@
+-export async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
+-  return operation();
++type RetryOptions = {
++  attempts?: number;
++  retryable?: (error: unknown) => boolean;
++};
++
++export async function withRetry<T>(
++  operation: () => Promise<T>,
++  { attempts = 3, retryable = () => true }: RetryOptions = {},
++): Promise<T> {
++  let lastError: unknown;
++
++  for (let attempt = 1; attempt <= attempts; attempt += 1) {
++    try {
++      // The caller's fetch has no AbortSignal here; a stalled upstream can keep
++      // this promise pending forever and the retry budget is never reached.
++      return await operation();
++    } catch (error) {
++      lastError = error;
++      if (!retryable(error) || attempt === attempts) throw error;
++      await new Promise((resolve) => setTimeout(resolve, attempt * 100));
++    }
++  }
++
++  throw lastError;
+ }
+diff --git a/infra/main.tf b/infra/main.tf
+index 3fcb441..a72d81f 100644
+--- a/infra/main.tf
++++ b/infra/main.tf
+@@ -44,6 +44,18 @@ resource "aws_security_group" "checkout" {
+   vpc_id = var.vpc_id
+ }
++
++resource "aws_security_group_rule" "redis_debug_ingress" {
++  type              = "ingress"
++  security_group_id = aws_security_group.redis.id
++  protocol          = "tcp"
++  from_port         = 6379
++  to_port           = 6379
++  cidr_blocks       = ["0.0.0.0/0"]
++  description       = "temporary checkout debugging access"
++}

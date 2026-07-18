@@ -219,34 +219,51 @@ function WorkingIndicator({ steps, step }: { steps: PhaseStep[]; step: number })
 
 function PlanBody({ plan }: { plan: IssueDetail["plan"] }) {
   const [open, setOpen] = useState(false);
-  const rootCause = plan?.root_cause_hypothesis ?? "Scoped the request into a development plan.";
+  const approach = plan?.approach ?? plan?.root_cause_hypothesis ?? "Scoped the request into a development plan.";
+  const criteria = plan?.acceptance_criteria ?? [];
+  const subtasks = plan?.subtasks ?? [];
   const files = plan?.file_boundary ?? [];
-  const steps = [
-    "Reproduce the reported behavior behind a failing test.",
-    "Apply the minimal fix within the file boundary below.",
-    "Add regression coverage, then update the changelog.",
-  ];
+
   return (
     <div className="text-sm text-gh-fg">
-      <p>{rootCause}</p>
+      <p>{approach}</p>
+
+      {/* calm summary of the spec — always visible */}
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gh-fgMuted">
+        {criteria.length > 0 && <span>✓ {criteria.length} acceptance criteria</span>}
+        {subtasks.length > 0 && <span>• {subtasks.length} subtasks</span>}
+        {files.length > 0 && <span>⌖ {files.length} files in scope</span>}
+      </div>
+
       {!open ? (
-        <div className="relative">
-          <ul className="ml-4 mt-2 max-h-6 list-disc overflow-hidden text-gh-fgMuted">
-            <li>{steps[0]}</li>
-            <li>{steps[1]}</li>
-          </ul>
-          <div className="pointer-events-none absolute inset-x-0 bottom-5 h-6 bg-gradient-to-t from-white to-transparent" />
-          <button type="button" onClick={() => setOpen(true)} className="mt-1 text-sm font-semibold text-[#0969DA] hover:underline">
-            Show full plan
-          </button>
-        </div>
+        <button type="button" onClick={() => setOpen(true)} className="mt-1.5 text-sm font-semibold text-[#0969DA] hover:underline">
+          Show full spec
+        </button>
       ) : (
-        <div className="mt-2 space-y-3">
-          <ul className="ml-4 list-disc space-y-1 text-gh-fg">
-            {steps.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
+        <div className="mt-3 space-y-3">
+          {criteria.length > 0 && (
+            <div>
+              <div className="mb-1 text-xs font-semibold text-gh-fgMuted">Acceptance criteria</div>
+              <ul className="space-y-1">
+                {criteria.map((c) => (
+                  <li key={c} className="flex gap-2">
+                    <span className="mt-px text-[#1F883D]">✓</span>
+                    <span>{c}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {subtasks.length > 0 && (
+            <div>
+              <div className="mb-1 text-xs font-semibold text-gh-fgMuted">Subtasks</div>
+              <ol className="ml-4 list-decimal space-y-1">
+                {subtasks.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ol>
+            </div>
+          )}
           {files.length > 0 && (
             <div>
               <div className="mb-1 text-xs font-semibold text-gh-fgMuted">File boundary</div>

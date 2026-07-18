@@ -63,10 +63,11 @@ export interface PhaseStep {
 // What the AI is "doing" while a phase runs. These map to the event names the
 // real backend emits, so the demo mirrors the actual bus traffic.
 export const PLANNING_STEPS: PhaseStep[] = [
-  { label: "Recalling prior art…", done: "Recalled 2 prior issues", event: "recall.hit" },
-  { label: "Locating file boundary…", done: "Located the file boundary", event: "locate.done" },
-  { label: "Routing assignee…", done: "Routed to the best assignee", event: "route.assigned" },
-  { label: "Drafting the plan…", done: "Drafted the plan", event: "plan.created" },
+  { label: "Recalling prior art…", done: "Recalled prior issues", event: "recall.hit" },
+  { label: "Scoping the blast radius…", done: "Scoped the files + blast radius", event: "locate.done" },
+  { label: "Writing acceptance criteria…", done: "Wrote acceptance criteria", event: "plan.created" },
+  { label: "Breaking it into subtasks…", done: "Broke it into subtasks", event: "plan.created" },
+  { label: "Assigning by skill…", done: "Assigned the owner", event: "route.assigned" },
 ];
 
 // Implementation now runs autonomously — the AI writes the change and base code.

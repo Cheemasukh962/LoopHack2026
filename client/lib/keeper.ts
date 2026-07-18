@@ -53,12 +53,28 @@ function makeId(): string {
 function synthesizePlan(issue: Issue, assignee?: CreateOpts["assignee"]): Plan {
   const words = issue.title.toLowerCase().split(/\s+/).filter(Boolean);
   const guessArea = words.find((w) => w.length > 3) ?? "core";
+  const files = [`client/**/*${guessArea}*`, "shared/api.ts"];
+  const owner = assignee?.name ?? CURRENT_USER.name;
+  const title = issue.title.trim() || "the reported issue";
   return {
     plan_id: `plan_${issue.issue_id}`,
     issue_id: issue.issue_id,
     version: 1,
-    root_cause_hypothesis: `Scoped from the request: "${issue.title}".`,
-    file_boundary: [`client/**/*${guessArea}*`, "shared/api.ts"],
+    root_cause_hypothesis: `Scoped from the request: "${title}".`,
+    approach: `Reproduce "${title}" behind a failing test, apply the smallest fix within the scoped boundary, and back it with regression coverage before human review.`,
+    acceptance_criteria: [
+      `"${title}" no longer reproduces under the new test`,
+      "The change stays inside the file boundary",
+      "A regression test covers the fix and CI is green",
+      `${owner} reviews and approves before merge`,
+    ],
+    subtasks: [
+      "Write a failing test that reproduces the behavior",
+      `Apply the minimal fix in ${files[0]}`,
+      "Add regression coverage and update the changelog",
+      "Open a PR for human review",
+    ],
+    file_boundary: files,
     assignee: assignee
       ? { name: assignee.name, context_score: assignee.context_score ?? 0.9, why: assignee.why ?? "Matched by résumé." }
       : { name: CURRENT_USER.name, context_score: 0.82, why: `Highest recent context on ${guessArea}.` },

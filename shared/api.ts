@@ -43,6 +43,9 @@ export interface Plan {
   issue_id: string;
   version: number;
   root_cause_hypothesis: string;
+  approach?: string; // the proposed change (PM spec)
+  acceptance_criteria?: string[]; // "done when…"
+  subtasks?: string[]; // the PM's breakdown
   file_boundary: string[];
   assignee: { name: string; context_score: number; why: string } | null;
 }

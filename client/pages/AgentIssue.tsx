@@ -222,6 +222,8 @@ function PlanBody({ plan }: { plan: IssueDetail["plan"] }) {
   const approach = plan?.approach ?? plan?.root_cause_hypothesis ?? "Scoped the request into a development plan.";
   const criteria = plan?.acceptance_criteria ?? [];
   const subtasks = plan?.subtasks ?? [];
+  const blast = plan?.blast_radius;
+  const testStrategy = plan?.test_strategy;
   const files = plan?.file_boundary ?? [];
 
   return (
@@ -262,6 +264,22 @@ function PlanBody({ plan }: { plan: IssueDetail["plan"] }) {
                   <li key={s}>{s}</li>
                 ))}
               </ol>
+            </div>
+          )}
+          {(blast || testStrategy) && (
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              {blast && (
+                <div>
+                  <div className="mb-1 text-xs font-semibold text-gh-fgMuted">Blast radius</div>
+                  <p>{blast.call_sites} call sites · {blast.services_affected} service{blast.services_affected === 1 ? "" : "s"}</p>
+                </div>
+              )}
+              {testStrategy && (
+                <div className="min-w-[220px] flex-1">
+                  <div className="mb-1 text-xs font-semibold text-gh-fgMuted">Test strategy</div>
+                  <p>{testStrategy}</p>
+                </div>
+              )}
             </div>
           )}
           {files.length > 0 && (
@@ -314,6 +332,20 @@ function PhaseSection({
 
 /* ------------------------------- lifecycle card ------------------------------- */
 
+// A small proven-owner bench Keeper re-delegates to when a verification fails.
+const REASSIGN_TEAM = [
+  { name: "Dana Ibrahim", skills: "distributed systems, reliability, incident response", commits: 428 },
+  { name: "Marco Chen", skills: "security, authentication, OAuth", commits: 311 },
+  { name: "Priya Nair", skills: "Terraform, AWS, SRE", commits: 276 },
+];
+function pickReassignee(current: string) {
+  const cand = REASSIGN_TEAM.filter((p) => p.name !== current).sort((a, b) => b.commits - a.commits)[0] ?? REASSIGN_TEAM[0];
+  return {
+    name: cand.name,
+    why: `${current}'s change failed verification, so Keeper re-delegated to the proven owner — ${cand.name} has the strongest recent context here (${cand.skills}; ${cand.commits} commits).`,
+  };
+}
+
 function LifecycleCard({
   plan,
   progress,
@@ -330,6 +362,9 @@ function LifecycleCard({
   onReview: () => void;
 }) {
   const reviewerName = plan?.assignee?.name ?? "samuelalake";
+  const [verify, setVerify] = useState<"pass" | "fail">("pass");
+  const taskTitle = plan?.root_cause_hypothesis?.match(/"([^"]+)"/)?.[1] ?? "this change";
+  const reassign = pickReassignee(reviewerName);
 
   const planningStatus: PhaseStatus = progress.planningDone
     ? "done"
@@ -392,25 +427,70 @@ function LifecycleCard({
           )}
         </PhaseSection>
 
-        {/* Implementation — autonomous (AI writes the change + base code) */}
-        <PhaseSection title="Implementation" status={implementationStatus}>
+        {/* Development — AI writes the change on the branch, then verifies it */}
+        <PhaseSection title="Development" status={implementationStatus}>
           {implementationStatus === "working" && running ? (
             <WorkingIndicator steps={IMPLEMENTATION_STEPS} step={running.step} />
           ) : implementationStatus === "stopped" ? (
             <StoppedRow onResume={onResume} />
           ) : implementationStatus === "locked" || implementationStatus === "waiting" ? (
             <span className="text-sm text-gh-fgMuted">Queued after planning…</span>
-          ) : (
+          ) : verify === "pass" ? (
             <div className="space-y-3">
               <div className="space-y-1">
-                <StepDot done label="Development" tag="AI wrote the change on a branch" />
+                <StepDot done label="Development" tag="AI wrote the change on the branch (we assume the assignee pushed it)" />
                 <div className="ml-[5px] h-6 w-0.5 bg-[#1F883D]" />
-                <StepDot done label="Verification" tag="Tests generated and passing" />
+                <StepDot done label="Verification" tag="AI checked the change — tests generated and passing" />
               </div>
               <div className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1F883D]">
                 <CheckCircleGreenIcon className="h-4 w-4" />
-                Implemented autonomously · base code ready for review
+                Verified autonomously · ready for review
               </div>
+              <button
+                type="button"
+                onClick={() => setVerify("fail")}
+                className="block text-xs text-gh-fgMuted hover:text-[#CF222E] hover:underline"
+              >
+                simulate a failed verification →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <StepDot done label="Development" tag="AI wrote the change on the branch" />
+                <div className="ml-[5px] h-6 w-0.5 bg-[#CF222E]" />
+                <div className="flex items-start gap-3">
+                  <span className="mt-1.5 h-3 w-3 flex-shrink-0 rounded-full bg-[#CF222E]" />
+                  <div>
+                    <div className="text-base font-medium">Verification</div>
+                    <div className="text-sm text-[#CF222E]">Failed — the change didn't meet the acceptance criteria</div>
+                  </div>
+                </div>
+                <div className="ml-[5px] h-6 w-0.5 bg-[#BC4C00]" />
+                <div className="flex items-start gap-3">
+                  <span className="mt-1.5 h-3 w-3 flex-shrink-0 rounded-full bg-[#BC4C00]" />
+                  <div>
+                    <div className="text-base font-medium text-[#BC4C00]">Reassignment</div>
+                    <div className="text-sm text-gh-fgMuted">Re-delegated to a more qualified owner — no human</div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-md border border-[#BC4C00]/40 bg-[#FFF8F0] p-3">
+                <p className="text-sm text-gh-fg">
+                  <b>Reassigned to {reassign.name}</b>
+                </p>
+                <p className="mt-1 text-xs text-gh-fgMuted">{reassign.why}</p>
+                <p className="mt-1.5 text-xs text-gh-fgMuted">
+                  Task: <span className="text-gh-fg">{taskTitle}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVerify("pass")}
+                className="block text-xs text-gh-fgMuted hover:underline"
+              >
+                ↩ reset
+              </button>
             </div>
           )}
         </PhaseSection>

@@ -74,6 +74,8 @@ function synthesizePlan(issue: Issue, assignee?: CreateOpts["assignee"]): Plan {
       "Add regression coverage and update the changelog",
       "Open a PR for human review",
     ],
+    blast_radius: { call_sites: 2 + (guessArea.length % 4), services_affected: 1 },
+    test_strategy: "Unit-test the fix path, add a regression test that reproduces the issue, and smoke the affected surface before merge.",
     file_boundary: files,
     assignee: assignee
       ? { name: assignee.name, context_score: assignee.context_score ?? 0.9, why: assignee.why ?? "Matched by résumé." }

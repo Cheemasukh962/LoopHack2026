@@ -46,6 +46,8 @@ export interface Plan {
   approach?: string; // the proposed change (PM spec)
   acceptance_criteria?: string[]; // "done when…"
   subtasks?: string[]; // the PM's breakdown
+  blast_radius?: { call_sites: number; services_affected: number };
+  test_strategy?: string;
   file_boundary: string[];
   assignee: { name: string; context_score: number; why: string } | null;
 }

@@ -73,9 +73,8 @@ export const PLANNING_STEPS: PhaseStep[] = [
 // Implementation now runs autonomously — the AI writes the change and base code.
 export const IMPLEMENTATION_STEPS: PhaseStep[] = [
   { label: "Opening a working branch…", done: "Opened a working branch", event: "branch.created" },
-  { label: "Writing the change…", done: "Wrote the change", event: "push" },
-  { label: "Generating base code…", done: "Generated base code to start from", event: "push" },
-  { label: "Running the test suite…", done: "Tests passed", event: "ci.completed" },
+  { label: "Writing the change on the branch…", done: "Change written on the branch", event: "push" },
+  { label: "Verifying the change…", done: "Verification passed", event: "ci.completed" },
 ];
 
 /** Milliseconds each status line is shown before advancing. */

@@ -1,802 +1,290 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import {
-  AlertTriangleIcon,
-  CheckCircleGreenIcon,
-  CheckIcon,
-  ChevronCollapseIcon,
-  MergeBlockedIcon,
-  PendingDotIcon,
-} from "@/components/agent-issue/icons";
-import { Avatar } from "@/components/agent-issue/Timeline";
-import { CompassLogo } from "@/components/CompassLogo";
-import { AgentTimeline, type AgentAction } from "@/components/agent-issue/AgentTimeline";
-import { Badge, CommentCard, InlineCode } from "@/components/agent-issue/CommentCard";
-import { keeper, seedDemoIssue, DEMO_FEATURE_ID } from "@/lib/keeper";
-import { timeAgo } from "@/lib/utils";
-import {
-  getRun,
-  setRun,
-  PLANNING_STEPS,
-  IMPLEMENTATION_STEPS,
-  STEP_MS,
-  type PhaseStep,
-  type RunProgress,
-} from "@/lib/run-state";
-import type { IssueDetail } from "@shared/api";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { keeper, assigneeDisplayName } from "@/lib/keeper";
+import { describe, usePoll, SPONSOR_META, type Sponsor, type TimelineItem } from "@/lib/loop";
+import type { IssueDetail, LoopEvent, PhaseView, Stats, IssueSummary } from "@shared/api";
 
-const madeByOz = "https://api.builder.io/api/v1/image/assets/TEMP/90a99dd6e925502c62c330bbc0aeb14c37a274db?width=80";
-const samuelAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/15a001fa0d049362b83ad86d84c419cbf69c3ee1?width=40";
-const checkIcon = "https://api.builder.io/api/v1/image/assets/TEMP/b7181c122d914fe5de0b8c84cea316aff699540a?width=40";
+/* --------------------------------- atoms --------------------------------- */
 
-type PhaseStatus = "waiting" | "working" | "awaiting_human" | "done" | "locked" | "stopped";
-type RunPhase = "planning" | "implementation";
-const PHASE_STEPS: Record<RunPhase, PhaseStep[]> = { planning: PLANNING_STEPS, implementation: IMPLEMENTATION_STEPS };
-
-/* ------------------------------ intake Q&A ------------------------------ */
-
-const INTAKE_QUESTIONS = [
-  { q: "What kind of change is this?", options: ["Bug fix", "New feature", "Refactor"] },
-  { q: "Where does it mainly apply?", options: ["Frontend", "Backend", "Both"] },
-  { q: "How urgent is it?", options: ["Ship now", "This sprint", "Backlog"] },
-];
-
-function genDescription(title: string, answers: string[]): string {
-  const [kind, area, urgency] = answers;
-  return `${title}. This is a ${kind?.toLowerCase()} affecting the ${area?.toLowerCase()} surface, prioritized as "${urgency}". Compass will scope it to the smallest safe file boundary, back it with a regression test, and open it for human review before merge.`;
+function StatusDot({ status }: { status: string }) {
+  const color =
+    status === "passed" ? "#1F883D" : status === "active" ? "#BF8700" : status === "failed" ? "#CF222E" : "#8C959F";
+  return <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: color }} />;
 }
 
-// The Description block of the kickoff card: an AI multiple-choice intake that
-// writes a proper description once answered.
-function DescriptionIntake({ title, onComplete }: { title: string; onComplete: (d: string) => void }) {
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [writing, setWriting] = useState(false);
-  const i = answers.length;
-
-  useEffect(() => {
-    if (i === INTAKE_QUESTIONS.length && !writing) {
-      setWriting(true);
-      const t = setTimeout(() => onComplete(genDescription(title, answers)), 1100);
-      return () => clearTimeout(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i]);
-
-  // Once every question is answered, show the writing state (guards against
-  // rendering before the effect flips `writing`).
-  if (writing || i >= INTAKE_QUESTIONS.length) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-gh-fgMuted">
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-gh-border border-t-[#1F883D]" />
-        Writing a clear description…
-      </div>
-    );
-  }
-
-  const cur = INTAKE_QUESTIONS[i];
+function SponsorChip({ sponsor }: { sponsor: Exclude<Sponsor, null> }) {
+  const m = SPONSOR_META[sponsor];
   return (
-    <div>
-      <p className="text-sm text-gh-fgMuted">A couple of quick questions so I can scope this well:</p>
-      <div className="mt-3">
-        <p className="text-sm font-medium text-gh-fg">{cur.q}</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {cur.options.map((o) => (
-            <button
-              key={o}
-              type="button"
-              onClick={() => setAnswers((a) => [...a, o])}
-              className="rounded-full border border-gh-border px-3 py-1 text-sm text-gh-fg hover:bg-gh-canvasInset"
-            >
-              {o}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-gh-fgMuted">
-          Question {i + 1} of {INTAKE_QUESTIONS.length}
-        </p>
-      </div>
-      {answers.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {answers.map((a, idx) => (
-            <span key={idx} className="rounded-full bg-gh-canvasInset px-2 py-0.5 text-xs text-gh-fgMuted">
-              {a}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// The written description, truncated with a Show full description toggle so it
-// reads as "there's more here" — matching the Show full plan pattern.
-function DescriptionText({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div>
-      <p
-        className="whitespace-pre-wrap text-sm text-gh-fg"
-        style={open ? undefined : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
-      >
-        {text}
-      </p>
-      <button type="button" onClick={() => setOpen(!open)} className="mt-1 text-sm font-semibold text-[#0969DA] hover:underline">
-        {open ? "Show less" : "Show full description"}
-      </button>
-    </div>
-  );
-}
-
-/* --------------------------- small presentational --------------------------- */
-
-function AssigneeBadge({
-  name,
-  avatar,
-  state,
-  onAccept,
-}: {
-  name: string;
-  avatar?: string;
-  state: "assigned" | "suggested";
-  onAccept?: () => void;
-}) {
-  if (state === "assigned") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-gh-canvasInset px-2 py-0.5 text-xs font-medium text-gh-fg ring-1 ring-inset ring-gh-border">
-        {avatar && <Avatar src={avatar} alt={name} size={16} />}
-        {name}
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span className="inline-flex items-center gap-1 rounded-full border border-dashed border-gh-border px-2 py-0.5 text-xs font-medium text-gh-fgMuted">
-        {avatar && <Avatar src={avatar} alt={name} size={16} />}
-        {name}
-        <span className="text-[9px] font-semibold uppercase tracking-wide opacity-70">suggested</span>
-      </span>
-      {onAccept && (
-        <button
-          type="button"
-          onClick={onAccept}
-          aria-label={`Accept ${name}`}
-          className="flex h-5 w-5 items-center justify-center rounded-full border border-gh-border text-gh-fg hover:bg-gh-canvasInset"
-        >
-          <CheckIcon className="h-3 w-3" />
-        </button>
-      )}
+    <span
+      className="ml-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold align-middle"
+      style={{ color: m.color, background: `${m.color}14`, boxShadow: `inset 0 0 0 1px ${m.color}33` }}
+    >
+      {m.label}
     </span>
   );
 }
 
-function AssigneeRow({ label, children }: { label: string; children: ReactNode }) {
+/* ------------------------------- sponsor strip ---------------------------- */
+
+function SponsorStrip({ items }: { items: TimelineItem[] }) {
+  const latest: Partial<Record<Exclude<Sponsor, null>, string>> = {};
+  for (const it of items) if (it.sponsor) latest[it.sponsor] = it.detail || it.title;
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="font-bold text-gh-fgMuted">{label}</span>
-      {children}
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {(Object.keys(SPONSOR_META) as Array<Exclude<Sponsor, null>>).map((s) => {
+        const m = SPONSOR_META[s];
+        const active = Boolean(latest[s]);
+        return (
+          <div
+            key={s}
+            className="rounded-md border bg-white p-3 transition-all"
+            style={{ borderColor: active ? m.color : "#D1D9E0", boxShadow: active ? `0 0 0 1px ${m.color}` : undefined, opacity: active ? 1 : 0.55 }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold" style={{ color: active ? m.color : "#57606A" }}>{m.label}</span>
+              <span className="h-2 w-2 rounded-full" style={{ background: active ? m.color : "#C9D1D9" }} />
+            </div>
+            <p className="mt-0.5 text-[11px] uppercase tracking-wide text-gh-fgMuted">{m.blurb}</p>
+            <p className="mt-1 truncate text-xs text-gh-fg" title={latest[s]}>{active ? latest[s] : "waiting…"}</p>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function PhaseChip({ status }: { status: PhaseStatus }) {
-  const map: Record<PhaseStatus, { text: string; className: string; dot: string }> = {
-    waiting: { text: "Queued", className: "text-gh-fgMuted bg-gh-canvasInset", dot: "bg-gh-fgMuted" },
-    working: { text: "Working", className: "text-[#1F883D] bg-[#1F883D]/10", dot: "bg-[#1F883D] animate-pulse" },
-    awaiting_human: { text: "Your turn", className: "text-[#0969DA] bg-[#0969DA]/10", dot: "bg-[#0969DA]" },
-    done: { text: "Done", className: "text-[#1F883D] bg-[#1F883D]/10", dot: "bg-[#1F883D]" },
-    locked: { text: "Locked", className: "text-gh-fgMuted bg-gh-canvasInset", dot: "bg-gh-fgMuted" },
-    stopped: { text: "Stopped", className: "text-[#9A6700] bg-[#9A6700]/10", dot: "bg-[#9A6700]" },
-  };
-  const s = map[status];
-  return (
-    <span className={"inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium " + s.className}>
-      <span className={"h-1.5 w-1.5 rounded-full " + s.dot} />
-      {s.text}
-    </span>
-  );
-}
+/* -------------------------------- phase bar ------------------------------- */
 
-function WorkingIndicator({ steps, step }: { steps: PhaseStep[]; step: number }) {
-  const idx = Math.min(step, steps.length - 1);
-  const pct = Math.round(((idx + 1) / steps.length) * 100);
-  return (
-    <div className="flex items-center gap-3 py-1">
-      <span className="h-4 w-4 flex-shrink-0 animate-spin rounded-full border-2 border-gh-border border-t-[#1F883D]" />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm text-gh-fg">{steps[idx].label}</span>
-          <span className="font-mono text-xs text-gh-fgMuted">
-            {idx + 1}/{steps.length}
-          </span>
-        </div>
-        <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-gh-borderMuted">
-          <div className="h-full rounded-full bg-[#1F883D] transition-all duration-500" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PlanBody({ plan }: { plan: IssueDetail["plan"] }) {
-  const [open, setOpen] = useState(false);
-  const rootCause = plan?.root_cause_hypothesis ?? "Scoped the request into a development plan.";
-  const files = plan?.file_boundary ?? [];
-  const steps = [
-    "Reproduce the reported behavior behind a failing test.",
-    "Apply the minimal fix within the file boundary below.",
-    "Add regression coverage, then update the changelog.",
+function PhaseBar({ view }: { view: PhaseView | null }) {
+  const phases = view?.phases ?? [
+    { phase: "planning", status: "pending", detail: "", updated_at: "" },
+    { phase: "implementation", status: "pending", detail: "", updated_at: "" },
+    { phase: "review", status: "pending", detail: "", updated_at: "" },
   ];
   return (
-    <div className="text-sm text-gh-fg">
-      <p>{rootCause}</p>
-      {!open ? (
-        <div className="relative">
-          <ul className="ml-4 mt-2 max-h-6 list-disc overflow-hidden text-gh-fgMuted">
-            <li>{steps[0]}</li>
-            <li>{steps[1]}</li>
-          </ul>
-          <div className="pointer-events-none absolute inset-x-0 bottom-5 h-6 bg-gradient-to-t from-white to-transparent" />
-          <button type="button" onClick={() => setOpen(true)} className="mt-1 text-sm font-semibold text-[#0969DA] hover:underline">
-            Show full plan
-          </button>
+    <div className="rounded-md border border-gh-borderMuted bg-white p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {phases.map((p) => (
+          <div key={p.phase} className="flex items-center gap-2">
+            <StatusDot status={p.status} />
+            <div>
+              <p className="text-sm font-semibold capitalize text-gh-fg">{p.phase}</p>
+              <p className="text-xs text-gh-fgMuted">{p.detail || p.status}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------- plan card ------------------------------- */
+
+function PlanCard({ detail }: { detail: IssueDetail }) {
+  const plan = detail.plan;
+  if (!plan) return (
+    <div className="rounded-md border border-gh-borderMuted bg-white p-4 text-sm text-gh-fgMuted">
+      Keeper is drafting a plan…
+    </div>
+  );
+  const name = assigneeDisplayName(plan);
+  return (
+    <div className="rounded-md border border-gh-borderMuted bg-white p-4">
+      <h3 className="text-sm font-semibold text-gh-fg">Keeper's plan</h3>
+      <p className="mt-1 text-sm text-gh-fg">{plan.root_cause_hypothesis}</p>
+
+      {plan.assignee && (
+        <div className="mt-3 rounded-[3px] bg-gh-canvasInset p-3">
+          <p className="text-sm font-semibold text-gh-fg">
+            Assigned {name} <span className="font-normal text-gh-fgMuted">· context {plan.assignee.context_score.toFixed(2)}</span>
+            <SponsorChip sponsor="nexla" />
+          </p>
+          {plan.assignee.why && <p className="mt-1 text-xs text-gh-fgMuted">{plan.assignee.why}</p>}
         </div>
-      ) : (
-        <div className="mt-2 space-y-3">
-          <ul className="ml-4 list-disc space-y-1 text-gh-fg">
-            {steps.map((s) => (
-              <li key={s}>{s}</li>
+      )}
+
+      {plan.file_boundary?.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gh-fgMuted">File boundary <span className="font-normal normal-case">(Pomerium-enforced)</span></p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {plan.file_boundary.map((f) => (
+              <code key={f} className="rounded bg-gh-canvasInset px-1.5 py-0.5 text-xs text-gh-fg">{f}</code>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {plan.prior_art && plan.prior_art.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gh-fgMuted">Prior art <SponsorChip sponsor="nexla" /></p>
+          <ul className="mt-1 space-y-1">
+            {plan.prior_art.slice(0, 3).map((pa) => (
+              <li key={pa.issue_id} className="text-xs text-gh-fg">
+                <span className="font-semibold">{pa.issue_id}</span> <span className="text-gh-fgMuted">({Math.round(pa.similarity * 100)}%)</span> — {pa.resolution}
+              </li>
             ))}
           </ul>
-          {files.length > 0 && (
-            <div>
-              <div className="mb-1 text-xs font-semibold text-gh-fgMuted">File boundary</div>
-              <div className="flex flex-wrap gap-1.5">
-                {files.map((f) => (
-                  <InlineCode key={f}>{f}</InlineCode>
-                ))}
-              </div>
-            </div>
-          )}
-          <button type="button" onClick={() => setOpen(false)} className="text-sm font-semibold text-[#0969DA] hover:underline">
-            Show less
-          </button>
+        </div>
+      )}
+
+      {plan.recommended_tool && (
+        <div className="mt-3 rounded-[3px] border border-[#0E9F6E33] bg-[#0E9F6E0a] p-3">
+          <p className="text-sm font-semibold text-gh-fg">
+            Discovered tool: <code className="text-[#0E9F6E]">{plan.recommended_tool.tool_name}</code>
+            <SponsorChip sponsor="zero" />
+          </p>
+          <p className="mt-0.5 text-xs text-gh-fgMuted">{plan.recommended_tool.why}</p>
         </div>
       )}
     </div>
   );
 }
 
-function PhaseSection({
-  title,
-  status,
-  assignee,
-  action,
-  children,
-}: {
-  title: string;
-  status: PhaseStatus;
-  assignee?: ReactNode;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  const dim = status === "waiting" || status === "locked";
+/* ------------------------------- timeline list ---------------------------- */
+
+function Timeline({ items }: { items: TimelineItem[] }) {
   return (
-    <section className={dim ? "opacity-60" : undefined}>
-      <div className="flex items-center gap-2">
-        <h3 className="text-[18px] font-semibold leading-6 tracking-[-0.02em] text-gh-fg">{title}</h3>
-        <PhaseChip status={status} />
-        {action && <div className="ml-auto">{action}</div>}
-      </div>
-      <div className="mt-2 rounded-md border border-gh-border bg-white p-3 shadow-[0_1px_1px_rgba(37,41,46,0.1),0_3px_6px_rgba(37,41,46,0.12)]">
-        {assignee}
-        <div className={assignee ? "mt-2" : undefined}>{children}</div>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------- lifecycle card ------------------------------- */
-
-function LifecycleCard({
-  plan,
-  progress,
-  running,
-  onStop,
-  onResume,
-  onReview,
-}: {
-  plan: IssueDetail["plan"];
-  progress: RunProgress;
-  running: { phase: RunPhase; step: number } | null;
-  onStop: () => void;
-  onResume: () => void;
-  onReview: () => void;
-}) {
-  const reviewerName = plan?.assignee?.name ?? "samuelalake";
-
-  const planningStatus: PhaseStatus = progress.planningDone
-    ? "done"
-    : running?.phase === "planning"
-      ? "working"
-      : progress.stopped
-        ? "stopped"
-        : "waiting";
-
-  const implementationStatus: PhaseStatus = progress.implementationDone
-    ? "done"
-    : !progress.planningDone
-      ? "locked"
-      : running?.phase === "implementation"
-        ? "working"
-        : progress.stopped
-          ? "stopped"
-          : "waiting";
-
-  const reviewStatus: PhaseStatus = progress.reviewDone
-    ? "done"
-    : !progress.implementationDone
-      ? "locked"
-      : "awaiting_human";
-
-  const anyRunning = running !== null;
-
-  return (
-    <CommentCard
-      author="Compass"
-      action="is running the task through its lifecycle"
-      badges={<Badge>Bot</Badge>}
-      headerRight={
-        anyRunning ? (
-          <button
-            type="button"
-            onClick={onStop}
-            className="inline-flex items-center gap-1.5 rounded-md border border-gh-border px-2.5 py-1 text-xs font-medium text-[#CF222E] hover:bg-[#CF222E]/5"
-          >
-            <span className="h-2.5 w-2.5 rounded-[2px] bg-[#CF222E]" />
-            Stop
-          </button>
-        ) : (
-          <Badge>Contributor</Badge>
-        )
-      }
-      showReaction
-    >
-      <div className="space-y-4">
-        {/* Planning — autonomous */}
-        <PhaseSection title="Planning" status={planningStatus}>
-          {planningStatus === "working" && running ? (
-            <WorkingIndicator steps={PLANNING_STEPS} step={running.step} />
-          ) : planningStatus === "done" ? (
-            <PlanBody plan={plan} />
-          ) : planningStatus === "stopped" ? (
-            <StoppedRow onResume={onResume} />
-          ) : (
-            <span className="text-sm text-gh-fgMuted">Queued…</span>
-          )}
-        </PhaseSection>
-
-        {/* Implementation — autonomous (AI writes the change + base code) */}
-        <PhaseSection title="Implementation" status={implementationStatus}>
-          {implementationStatus === "working" && running ? (
-            <WorkingIndicator steps={IMPLEMENTATION_STEPS} step={running.step} />
-          ) : implementationStatus === "stopped" ? (
-            <StoppedRow onResume={onResume} />
-          ) : implementationStatus === "locked" || implementationStatus === "waiting" ? (
-            <span className="text-sm text-gh-fgMuted">Queued after planning…</span>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <StepDot done label="Development" tag="AI wrote the change on a branch" />
-                <div className="ml-[5px] h-6 w-0.5 bg-[#1F883D]" />
-                <StepDot done label="Verification" tag="Tests generated and passing" />
-              </div>
-              <div className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1F883D]">
-                <CheckCircleGreenIcon className="h-4 w-4" />
-                Implemented autonomously · base code ready for review
-              </div>
-            </div>
-          )}
-        </PhaseSection>
-
-        {/* Human review — the human's entry point */}
-        <PhaseSection
-          title="Human review"
-          status={reviewStatus}
-          assignee={
-            <AssigneeRow label="Assigned to:">
-              <AssigneeBadge name={reviewerName} avatar={samuelAvatar} state="assigned" />
-            </AssigneeRow>
-          }
-          action={
-            reviewStatus === "locked" ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-gh-border px-2 py-0.5 text-[11px] font-medium text-gh-fgMuted opacity-60">
-                Auto
-              </span>
-            ) : undefined
-          }
-        >
-          {reviewStatus === "locked" ? (
-            <span className="text-sm text-gh-fgMuted">Locked — Compass is still implementing.</span>
-          ) : reviewStatus === "done" ? (
-            <p className="text-sm text-gh-fg">
-              Approved by <span className="font-medium">{reviewerName}</span>. Ready to merge.
-            </p>
-          ) : (
-            <div className="space-y-3">
+    <div className="rounded-md border border-gh-borderMuted bg-white">
+      <div className="border-b border-gh-borderMuted px-4 py-2 text-sm font-semibold text-gh-fg">Live event stream</div>
+      <ol className="divide-y divide-gh-borderMuted">
+        {items.length === 0 && <li className="px-4 py-3 text-sm text-gh-fgMuted">Waiting for the loop…</li>}
+        {items.map((it) => (
+          <li key={it.event_id} className="flex items-start gap-3 px-4 py-2.5">
+            <code className="mt-0.5 shrink-0 rounded bg-gh-canvasInset px-1.5 py-0.5 text-[11px] text-gh-fgMuted">{it.type}</code>
+            <div className="min-w-0 flex-1">
               <p className="text-sm text-gh-fg">
-                Compass implemented this and generated base code. Review the plan and the change, then approve or send it back.
+                {it.title}
+                {it.sponsor && <SponsorChip sponsor={it.sponsor} />}
               </p>
-              <button
-                type="button"
-                onClick={onReview}
-                className="rounded-md border border-[rgba(31,35,40,0.15)] bg-[#0969DA] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_1px_0_0_rgba(31,35,40,0.04)] hover:brightness-95"
-              >
-                Start human review
-              </button>
+              {it.detail && <p className="truncate text-xs text-gh-fgMuted" title={it.detail}>{it.detail}</p>}
             </div>
-          )}
-        </PhaseSection>
-      </div>
-    </CommentCard>
-  );
-}
-
-function StepDot({ done, label, tag }: { done: boolean; label: string; tag: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className={"mt-1.5 h-3 w-3 flex-shrink-0 rounded-full " + (done ? "bg-[#1F883D]" : "bg-[#BDBDBD]")} />
-      <div>
-        <div className="text-base font-medium">{label}</div>
-        <div className="text-sm text-gh-fgMuted">{tag}</div>
-      </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
 
-function StoppedRow({ onResume }: { onResume: () => void }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="text-sm text-gh-fgMuted">Run stopped.</span>
-      <button
-        type="button"
-        onClick={onResume}
-        className="rounded-md border border-gh-border px-2.5 py-1 text-xs font-medium text-gh-fg hover:bg-gh-canvasInset"
-      >
-        Resume
-      </button>
-    </div>
-  );
-}
+/* --------------------------------- page ----------------------------------- */
 
-/* ------------------------------ merge checks ------------------------------ */
-
-function CheckRow({ icon, label, pending = false, required = false }: { icon: string; label: string; pending?: boolean; required?: boolean }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2 border-b border-gh-borderMuted px-3 py-1.5 last:border-b-0">
-      {pending ? <PendingDotIcon className="h-4 w-4 flex-shrink-0" /> : <CheckCircleGreenIcon className="h-4 w-4 flex-shrink-0" />}
-      <img src={icon} alt="" className="h-5 w-5 flex-shrink-0 rounded shadow-[0_0_0_1px_rgba(31,35,40,0.15)]" />
-      <span className="min-w-0 flex-1 truncate text-sm text-gh-fg">{label}</span>
-      {required && <Badge>Required</Badge>}
-      <button type="button" aria-label="Check options" className="rounded-md p-1.5 hover:bg-black/5"><span className="text-base text-gh-fgMuted">•••</span></button>
-    </div>
-  );
-}
-
-function MergeChecks({ progress }: { progress: RunProgress }) {
-  const [openPending, setOpenPending] = useState(true);
-  const [openSuccess, setOpenSuccess] = useState(true);
-  const [merged, setMerged] = useState(false);
-
-  const phases = [
-    { label: "Planning", done: progress.planningDone, icon: checkIcon },
-    { label: "Implementation", done: progress.implementationDone, icon: checkIcon },
-    { label: "Human review", done: progress.reviewDone, icon: checkIcon },
-  ];
-  const pending = phases.filter((p) => !p.done);
-  const success = phases.filter((p) => p.done);
-  const allDone = pending.length === 0;
-
-  return (
-    <div className="overflow-hidden rounded-md border border-gh-border bg-white">
-      <div className="flex items-start gap-3 p-4">
-        <span className={"flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full " + (allDone ? "bg-[#1F883D]" : "bg-[#9A6700]")}>
-          {allDone ? <CheckIcon className="h-4 w-4 text-white" /> : <AlertTriangleIcon />}
-        </span>
-        <div>
-          <h3 className="text-base font-semibold text-gh-fg">
-            {allDone ? "All phases complete" : `${pending.length} phase${pending.length === 1 ? "" : "s"} awaiting`}
-          </h3>
-          <p className="text-sm text-gh-fgMuted">
-            {allDone ? "This task is ready to merge." : "You need to complete all phases before you can merge"}
-          </p>
-        </div>
-      </div>
-      <div className="border-t border-gh-borderMuted bg-gh-canvasInset px-2 py-2">
-        {pending.length > 0 && (
-          <>
-            <button type="button" onClick={() => setOpenPending(!openPending)} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gh-fgMuted">
-              <span>{pending.length} pending check{pending.length === 1 ? "" : "s"}</span>
-              <ChevronCollapseIcon className={openPending ? "rotate-180" : ""} />
-            </button>
-            {openPending &&
-              pending.map((p) => <CheckRow key={p.label} icon={p.icon} label={`${p.label}  Expected — Waiting for status to be reported`} pending required />)}
-          </>
-        )}
-        {success.length > 0 && (
-          <>
-            <button type="button" onClick={() => setOpenSuccess(!openSuccess)} className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-gh-fgMuted">
-              <span>{success.length} successful check{success.length === 1 ? "" : "s"}</span>
-              <ChevronCollapseIcon className={openSuccess ? "rotate-180" : ""} />
-            </button>
-            {openSuccess && (
-              <div>
-                {success.map((p) => (
-                  <CheckRow key={p.label} icon={p.icon} label={p.label} />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-      <div className="border-t border-gh-borderMuted p-3">
-        <button
-          type="button"
-          disabled={!allDone || merged}
-          onClick={() => setMerged(true)}
-          className={
-            "flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-white " +
-            (merged
-              ? "bg-[#8250DF]"
-              : allDone
-                ? "bg-[#1F883D] hover:brightness-95"
-                : "cursor-not-allowed bg-[#8c959f]")
-          }
-        >
-          {merged ? (
-            <>
-              <CheckIcon className="h-4 w-4" /> Merged · pushed to GitHub
-            </>
-          ) : (
-            "Merge & push to GitHub"
-          )}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------- page -------------------------------- */
-
-const DEMO_DETAIL: IssueDetail = {
-  issue: {
-    issue_id: "demo",
-    title: "New letter-spacing icon",
-    body: "Added new letter-spacing icon. It is used to adjust the spacing between characters, either increasing or decreasing the distance.",
-    state: "open",
-    provenance: "human",
-    author: { name: "madebyoz", github_handle: "madebyoz", avatar_url: madeByOz },
-    created_at: new Date(Date.now() - 5 * 864e5).toISOString(),
-  },
-  plan: null,
-  versions: 1,
-};
+const advanced = new Set<string>();
 
 export default function AgentIssue() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const effId = id ?? "demo";
+  const issueId = id ?? "";
+  const [busy, setBusy] = useState<string | null>(null);
 
-  const [detail, setDetail] = useState<IssueDetail | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "missing">("loading");
-  const [progress, setProgress] = useState<RunProgress>(() => getRun(effId));
-  const [running, setRunning] = useState<{ phase: RunPhase; step: number } | null>(null);
+  const detail = usePoll<IssueDetail | null>(() => (issueId ? keeper.getIssue(issueId) : Promise.resolve(null)), 1200, [issueId]);
+  const events = usePoll<LoopEvent[]>(() => (issueId ? keeper.getEvents(issueId) : Promise.resolve([])), 1200, [issueId]);
+  const phases = usePoll<PhaseView | null>(() => (issueId ? keeper.getPhases(issueId) : Promise.resolve(null)), 1200, [issueId]);
+  const stats = usePoll<Stats>(() => keeper.getStats(), 1500, []);
+  const issues = usePoll<IssueSummary[]>(() => keeper.listIssues(), 1500, []);
 
-  function update(patch: Partial<RunProgress>) {
-    setProgress(setRun(effId, patch));
-  }
-
-  useEffect(() => {
-    let active = true;
-    if (id === DEMO_FEATURE_ID) seedDemoIssue(); // ensure the seeded feature exists on direct nav
-    setProgress(getRun(effId));
-    setRunning(null);
-    if (!id) {
-      setDetail(DEMO_DETAIL);
-      setStatus("ready");
-      return;
-    }
-    setStatus("loading");
-    keeper.getIssue(id).then((d) => {
-      if (!active) return;
-      setDetail(d);
-      setStatus(d ? "ready" : "missing");
-    });
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  const intakeComplete = Boolean(detail?.issue.body) || progress.intakeDone;
-
-  // Auto-run planning then implementation once intake is complete; pause at human review.
-  useEffect(() => {
-    if (status !== "ready" || !detail || progress.stopped || running) return;
-    if (!intakeComplete) return;
-    if (!progress.planningDone) setRunning({ phase: "planning", step: 0 });
-    else if (!progress.implementationDone) setRunning({ phase: "implementation", step: 0 });
-    // else: implemented → pause, human review awaits.
-  }, [status, detail, progress, running, intakeComplete]);
-
-  useEffect(() => {
-    if (!running) return;
-    const steps = PHASE_STEPS[running.phase];
-    if (running.step >= steps.length) {
-      update(running.phase === "planning" ? { planningDone: true } : { implementationDone: true });
-      setRunning(null);
-      return;
-    }
-    const t = setTimeout(() => setRunning((r) => (r ? { ...r, step: r.step + 1 } : r)), STEP_MS);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
-
-  if (status === "loading") {
-    return (
-      <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-6 sm:px-8 lg:px-20 xl:px-24">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-64 rounded bg-gh-canvasInset" />
-          <div className="h-32 w-full max-w-[816px] rounded bg-gh-canvasInset" />
-        </div>
-      </main>
-    );
-  }
-
-  if (status === "missing" || !detail) {
-    return (
-      <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-6 sm:px-8 lg:px-20 xl:px-24">
-        <h1 className="text-2xl font-semibold text-gh-fg">Issue not found</h1>
-        <p className="mt-2 text-sm text-gh-fgMuted">
-          No issue with id <InlineCode>{id}</InlineCode>. It may not have been created in this session.
-        </p>
-      </main>
-    );
-  }
-
-  const { issue, plan } = detail;
-
-  // Timeline: intake + planning.
-  const planningDoneCount = progress.planningDone ? PLANNING_STEPS.length : running?.phase === "planning" ? running.step : 0;
-  const intakeTimeline: AgentAction[] = [
-    {
-      id: "ingest",
-      text: (
-        <span>
-          <span className="font-semibold text-gh-fg">Compass</span> ingested the task
-        </span>
-      ),
-      event: "issue.created",
-      state: "done",
-    },
-  ];
-  if (intakeComplete && !issue.body) {
-    intakeTimeline.push({ id: "clarified", text: "Clarified requirements, wrote the description", event: "issue.created", state: "done" });
-  }
-  if (progress.planVersion > 1) {
-    intakeTimeline.push({
-      id: "revised",
-      text: (
-        <span>
-          <span className="font-semibold text-gh-fg">Compass</span> restructured the plan to v{progress.planVersion} (changes requested)
-        </span>
-      ),
-      event: "plan.revised",
-      state: "done",
-    });
-  }
-  intakeTimeline.push(
-    ...PLANNING_STEPS.slice(0, planningDoneCount).map((s, i) => ({ id: `p${i}`, text: s.done, event: s.event, state: "done" as const })),
+  const items = useMemo<TimelineItem[]>(
+    () => (events ?? []).map(describe).filter((x): x is TimelineItem => Boolean(x)),
+    [events],
   );
-  if (running?.phase === "planning" && running.step < PLANNING_STEPS.length) {
-    intakeTimeline.push({ id: "p-active", text: PLANNING_STEPS[running.step].label, event: PLANNING_STEPS[running.step].event, state: "active" });
+
+  // Auto-advance the implementation phase once the plan exists (enriches the real stream).
+  useEffect(() => {
+    if (detail?.plan && issueId && !advanced.has(issueId)) {
+      advanced.add(issueId);
+      keeper.advanceImplementation(issueId).catch(() => advanced.delete(issueId));
+    }
+  }, [detail?.plan, issueId]);
+
+  const filedChildren = (issues ?? []).filter((i) => i.issue_id.startsWith(`SCAN-${issueId}-`));
+  const merged = (events ?? []).some((e) => e.type === "branch.merged");
+  const bodyFromEvent = (events ?? []).find((e) => e.type === "issue.created")?.payload?.body as string | undefined;
+
+  async function run(label: string, fn: () => Promise<void>) {
+    setBusy(label);
+    try { await fn(); } finally { setTimeout(() => setBusy(null), 400); }
   }
 
-  // Timeline: implementation + review outcome.
-  const implDoneCount = progress.implementationDone ? IMPLEMENTATION_STEPS.length : running?.phase === "implementation" ? running.step : 0;
-  const execTimeline: AgentAction[] = IMPLEMENTATION_STEPS.slice(0, implDoneCount).map((s, i) => ({
-    id: `i${i}`,
-    text: s.done,
-    event: s.event,
-    state: "done" as const,
-  }));
-  if (running?.phase === "implementation" && running.step < IMPLEMENTATION_STEPS.length) {
-    execTimeline.push({
-      id: "i-active",
-      text: IMPLEMENTATION_STEPS[running.step].label,
-      event: IMPLEMENTATION_STEPS[running.step].event,
-      state: "active",
-    });
+  if (!detail) {
+    return (
+      <main className="mx-auto w-full max-w-[900px] px-4 py-10 sm:px-8">
+        <Link to="/" className="text-sm text-[#0969DA] hover:underline">← Home</Link>
+        <p className="mt-6 text-sm text-gh-fgMuted">Loading {issueId}…</p>
+      </main>
+    );
   }
-  if (progress.reviewDone) {
-    execTimeline.push({
-      id: "approved",
-      text: (
-        <span>
-          <span className="font-semibold text-gh-fg">samuelalake</span> approved the change
-        </span>
-      ),
-      event: "branch.merged",
-      state: "done",
-    });
-  }
+
+  const { issue } = detail;
+  const isKeeper = issue.provenance !== "human";
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-6 sm:px-8 lg:px-20 xl:px-24">
-      <div className="mb-5">
-        <h1 className="text-3xl font-normal leading-[48px] tracking-[-0.02em] text-gh-fg sm:text-[32px]">{issue.title}</h1>
-        <p className="text-xs text-gh-fgMuted">
-          <span className="font-semibold">{issue.author.name}</span> created {timeAgo(issue.created_at)}
-        </p>
+    <main className="mx-auto w-full max-w-[900px] px-4 pb-16 pt-6 sm:px-8">
+      <div className="flex items-center justify-between">
+        <Link to="/" className="text-sm text-[#0969DA] hover:underline">← Home</Link>
+        {stats && (
+          <div className="flex items-center gap-3 text-xs text-gh-fgMuted">
+            <span>human filed <b className="text-gh-fg">{stats.human_filed}</b></span>
+            <span className="rounded-full bg-[#1F883D] px-2 py-0.5 font-semibold text-white">keeper filed {stats.keeper_filed}</span>
+          </div>
+        )}
       </div>
-      <div className="mx-auto w-full max-w-[816px]">
-        {/* Kickoff */}
-        <div className="flex items-start gap-3 sm:gap-4">
-          <Avatar src={issue.author.avatar_url ?? madeByOz} alt={issue.author.name} size={40} />
-          <CommentCard author={issue.author.name} action="kicked off a task" showReaction>
-            <h2 className="border-b border-gh-borderMuted pb-1.5 text-[21px] font-semibold text-gh-fg">{issue.title}</h2>
-            <div className="space-y-5 pt-4 text-sm text-gh-fg">
-              <div>
-                <h3 className="text-[18px] font-semibold">Description</h3>
-                <div className="mt-3">
-                  {issue.body ? (
-                    <DescriptionText text={issue.body} />
-                  ) : progress.intakeDone ? (
-                    <DescriptionText text={progress.description} />
-                  ) : (
-                    <DescriptionIntake title={issue.title} onComplete={(d) => update({ intakeDone: true, description: d })} />
-                  )}
-                </div>
-              </div>
-            </div>
-          </CommentCard>
+
+      <header className="mt-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isKeeper ? "bg-[#8250DF] text-white" : "bg-[#1F883D] text-white"}`}>
+            {isKeeper ? "filed by Keeper" : "filed by a human"}
+          </span>
+          <span className="text-xs text-gh-fgMuted">{issue.issue_id}</span>
+        </div>
+        <h1 className="mt-2 text-2xl font-semibold text-gh-fg">{issue.title}</h1>
+        {(issue.body || bodyFromEvent) && <p className="mt-1 max-w-2xl text-sm text-gh-fgMuted">{issue.body || bodyFromEvent}</p>}
+      </header>
+
+      <section className="mt-5 flex flex-col gap-4">
+        <SponsorStrip items={items} />
+        <PhaseBar view={phases} />
+        <PlanCard detail={detail} />
+
+        {/* actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          {!merged ? (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => run("merge", () => keeper.merge(issueId))}
+              className="rounded-md bg-[#1F883D] px-3 py-1.5 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50"
+            >
+              {busy === "merge" ? "Merging…" : "Merge & let Keeper scan"}
+            </button>
+          ) : (
+            <span className="rounded-md bg-[#DAFBE1] px-3 py-1.5 text-sm font-semibold text-[#1A7F37]">Merged · post-merge scan ran</span>
+          )}
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => run("ci", () => keeper.failCi(issueId))}
+            className="rounded-md border border-gh-border px-3 py-1.5 text-sm font-medium text-gh-fg hover:bg-gh-canvasInset disabled:opacity-50"
+          >
+            {busy === "ci" ? "…" : "Simulate CI failure → self-replan"}
+          </button>
         </div>
 
-        <div className="mt-3">
-          <AgentTimeline entries={intakeTimeline} />
-        </div>
-
-        {/* Lifecycle */}
-        <div className="mt-3 flex items-start gap-3 sm:gap-4">
-          <CompassLogo size={40} rounded="md" />
-          <LifecycleCard
-            plan={plan}
-            progress={progress}
-            running={running}
-            onStop={() => {
-              update({ stopped: true });
-              setRunning(null);
-            }}
-            onResume={() => update({ stopped: false })}
-            onReview={() => navigate(`/issue/${effId}/review`)}
-          />
-        </div>
-
-        {execTimeline.length > 0 && (
-          <div className="mt-3">
-            <AgentTimeline entries={execTimeline} />
+        {filedChildren.length > 0 && (
+          <div className="rounded-md border border-[#8250DF55] bg-[#FBEFFF] p-4">
+            <p className="text-sm font-semibold text-[#6E40C9]">
+              Keeper filed {filedChildren.length} new issue{filedChildren.length > 1 ? "s" : ""} — no human touched it.
+            </p>
+            <ul className="mt-2 space-y-1">
+              {filedChildren.map((c) => (
+                <li key={c.issue_id}>
+                  <Link to={`/issue/${c.issue_id}`} className="text-sm text-[#0969DA] hover:underline">
+                    {c.issue_id} — {c.title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
-        {/* Merge gate */}
-        <div className="mt-3 flex items-start gap-3 sm:gap-4">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-gh-fg">
-            <MergeBlockedIcon />
-          </div>
-          <div className="min-w-0 flex-1">
-            <MergeChecks progress={progress} />
-          </div>
-        </div>
-      </div>
+        <Timeline items={items} />
+      </section>
     </main>
   );
 }

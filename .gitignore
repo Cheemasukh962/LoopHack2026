@@ -25,3 +25,8 @@ dist-ssr
 
 .config/
 !.env
+
+# Backend secrets — never commit (holds ANTHROPIC_API_KEY etc.)
+backend/.env
+backend/node_modules
+backend/dist

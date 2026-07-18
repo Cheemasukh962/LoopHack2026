@@ -1,22 +1,28 @@
-import { defineConfig, Plugin } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
-import { createServer } from "./server";
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+// The frontend talks to the Keeper backend at /api/v1. In dev we proxy that to the
+// engine on :8787 (started alongside via `pnpm dev`). In production, set
+// VITE_KEEPER_API_URL to a deployed backend — otherwise the app uses its local mock.
+export default defineConfig(() => ({
   server: {
     host: "::",
     port: 8080,
+    proxy: {
+      "/api/v1": {
+        target: process.env.KEEPER_API_TARGET ?? "http://localhost:8787",
+        changeOrigin: true,
+      },
+    },
     fs: {
-      allow: ["./client", "./shared", "index.html"],
-      deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**", "server/**"],
+      deny: [".env", ".env.*", "*.{crt,pem}", "**/.git/**"],
     },
   },
   build: {
     outDir: "dist/spa",
   },
-  plugins: [react(), expressPlugin()],
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./client"),
@@ -24,16 +30,3 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
-
-function expressPlugin(): Plugin {
-  return {
-    name: "express-plugin",
-    apply: "serve", // Only apply during development (serve mode)
-    configureServer(server) {
-      const app = createServer();
-
-      // Add Express app as middleware to Vite dev server
-      server.middlewares.use(app);
-    },
-  };
-}

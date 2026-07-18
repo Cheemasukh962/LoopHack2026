@@ -4,9 +4,10 @@ An event-driven agent that turns **one** human-filed issue into a self-sustainin
 **recall → plan → assign → implement → review → merge → scan → file its own next issues → repeat.**
 A human touches the system once; everything after runs on the event bus.
 
-This branch (`main`) is the **Compass** web frontend — React 18 + React Router 6 + TypeScript + Vite + Tailwind.
-The full event-driven backend (event bus, planner, scanner, services) lives on the
-[`mainbackend`](https://github.com/Cheemasukh962/LoopHack2026/tree/mainbackend) branch.
+This is the **complete product**: the **Compass** web frontend (React 18 + Vite + Tailwind) wired to the
+real **Keeper engine** (event bus + services + sponsor integrations) in [`backend/`](backend/). One
+`pnpm dev` runs both — you file one issue and watch the **real** loop run and file its own next issues,
+with Nexla, Pomerium, and Zero.xyz lighting up live as their events fire.
 
 ## How it works
 
@@ -37,19 +38,20 @@ The full event-driven backend (event bus, planner, scanner, services) lives on t
 
 ### Under the hood
 
-- **Contract-first.** Client and server share one frozen contract (`shared/api.ts` ↔ `src/contract/`):
+- **Contract-first.** Client and engine share one frozen contract (`shared/api.ts` ↔ `backend/src/contract/`):
   `Issue`, `Plan` (with `file_boundary` + `assignee.context_score`), `IssueDetail`, and a
   `Provenance` of `human | keeper_decomposer | keeper_scanner` — the last two are how Keeper marks
   the issues *it* filed.
-- **Two interchangeable adapters** (`client/lib/keeper.ts`): a **mock** adapter backed by `localStorage`
-  so the app demos fully offline, and an **http** adapter that speaks `/api/v1`. Flip between them with
-  a single env var — `VITE_KEEPER_API_URL` — and nothing else in the UI changes.
-- **The UI mirrors the bus.** Every lifecycle step on the timeline is named after the exact event the
-  backend emits (`recall.hit`, `locate.done`, `route.assigned`, `plan.created`, `branch.created`,
-  `ci.completed`, `branch.merged`), so what you watch on screen is the real event stream.
-- **The engine** (`mainbackend`): an in-memory **event bus** (names map 1:1 to EventBridge), a seeded
+- **Live, not animated.** The detail page (`client/pages/AgentIssue.tsx`) **polls the real event stream**
+  (`GET /api/v1/events`) and renders it — the timeline, the phase gate, and the sponsor badges are all
+  driven by actual bus traffic (`client/lib/loop.ts` maps each event to a row + its sponsor).
+- **Two interchangeable adapters** (`client/lib/keeper.ts`): an **http** adapter that speaks `/api/v1`
+  (Vite proxies it to the engine in dev), and a **mock** adapter backed by `localStorage` for when no
+  backend is reachable (e.g. the Vercel-only deploy) — the UI is identical either way.
+- **The engine** (`backend/`): an in-memory **event bus** (names map 1:1 to EventBridge), a seeded
   **store**, and one service per stage (`recall`, `locate`, `router`, `planner`, `decomposer`, `scanner`).
-  Claude (`claude-opus-4-8`, `src/llm`) writes the plans and scans the diffs.
+  Claude (`claude-opus-4-8`, `backend/src/llm`) writes the plans and scans the diffs — with a built-in
+  offline fallback so the loop runs with no API key.
 
 ### Why the design holds
 
@@ -80,20 +82,35 @@ to run against the live services; leave them unset to use the built-in local fal
 ## Run locally
 
 ```bash
-pnpm install
-pnpm dev        # http://localhost:8080
+pnpm install                 # frontend deps
+pnpm --dir backend install   # engine deps
+pnpm dev                     # runs BOTH: web on :8080, engine on :8787
+```
+
+Open the printed web URL (Vite falls back to `:8081` if `:8080` is busy), file an issue, and watch the loop.
+
+**No API keys required.** The engine runs the whole loop offline with a built-in prompt-aware fallback LLM,
+and all three sponsors fall back to local implementations. To upgrade to **real Claude**, drop your key into
+`backend/.env` (gitignored) — the engine switches automatically, no code change:
+
+```bash
+# backend/.env   (see backend/.env.example)
+ANTHROPIC_API_KEY=sk-ant-...
+# optional live sponsors:
+# NEXLA_API_KEY=…   POMERIUM_ISSUER=…   POMERIUM_AUDIENCE=…   ZERO_API_URL=…
 ```
 
 ## Deploy
 
-Ships to **Vercel** out of the box — `vercel.json` sets the Vite build (`dist/spa`) and SPA routing.
-The app runs standalone on local mock data; set `VITE_KEEPER_API_URL` to point it at the live Keeper backend.
+The **frontend** ships to **Vercel** out of the box — `vercel.json` sets the Vite build (`dist/spa`) + SPA
+routing, and it runs standalone on local mock data. To make the deployed UI drive the **real** engine,
+host `backend/` (any Node host — it's an in-memory demo engine) and set `VITE_KEEPER_API_URL` to its URL.
 
 ## Repo layout
 
-| Path / branch | What's there |
+| Path | What's there |
 |---|---|
-| `main` (this branch) | **Compass** frontend — composer, live issue lifecycle, human review |
-| `client/` | React app — `pages/` (Index, AgentIssue, ReviewIssue), `lib/keeper.ts` (contract adapters) |
-| `shared/api.ts` | The frozen contract shared with the backend |
-| [`mainbackend`](https://github.com/Cheemasukh962/LoopHack2026/tree/mainbackend) | The event-driven engine — bus, store, services, and the Nexla / Pomerium / Zero.xyz integrations |
+| `client/` | **Compass** frontend — composer + feed (`Index`), live lifecycle (`AgentIssue`), human review (`ReviewIssue`); `lib/keeper.ts` (API adapter), `lib/loop.ts` (event → UI map) |
+| `shared/api.ts` | The frozen contract shared by client & engine |
+| `backend/` | The **Keeper engine** — event bus, store, services (`recall`/`locate`/`router`/`planner`/`decomposer`/`scanner`), API on `:8787`, and the Nexla / Pomerium / Zero.xyz integrations |
+| `vercel.json` | Static SPA deploy config |

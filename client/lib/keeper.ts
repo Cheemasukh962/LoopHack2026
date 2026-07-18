@@ -8,8 +8,12 @@
 import type { CreateIssueInput, Issue, IssueDetail, Plan } from "@shared/api";
 import { getRun, setRun } from "./run-state";
 
+export interface CreateOpts {
+  assignee?: { name: string; context_score?: number; why?: string };
+}
+
 export interface KeeperClient {
-  createIssue(input: CreateIssueInput): Promise<{ issue_id: string }>;
+  createIssue(input: CreateIssueInput, opts?: CreateOpts): Promise<{ issue_id: string }>;
   getIssue(id: string): Promise<IssueDetail | null>;
 }
 
@@ -46,7 +50,7 @@ function makeId(): string {
 // Keeper generates a plan asynchronously after an issue is filed. For the demo
 // we synthesize a plausible one from the issue text so the detail page has real,
 // input-derived content instead of "Lorem ipsum".
-function synthesizePlan(issue: Issue): Plan {
+function synthesizePlan(issue: Issue, assignee?: CreateOpts["assignee"]): Plan {
   const words = issue.title.toLowerCase().split(/\s+/).filter(Boolean);
   const guessArea = words.find((w) => w.length > 3) ?? "core";
   return {
@@ -55,16 +59,14 @@ function synthesizePlan(issue: Issue): Plan {
     version: 1,
     root_cause_hypothesis: `Scoped from the request: "${issue.title}".`,
     file_boundary: [`client/**/*${guessArea}*`, "shared/api.ts"],
-    assignee: {
-      name: CURRENT_USER.name,
-      context_score: 0.82,
-      why: `Highest recent context on ${guessArea}.`,
-    },
+    assignee: assignee
+      ? { name: assignee.name, context_score: assignee.context_score ?? 0.9, why: assignee.why ?? "Matched by résumé." }
+      : { name: CURRENT_USER.name, context_score: 0.82, why: `Highest recent context on ${guessArea}.` },
   };
 }
 
 const mockClient: KeeperClient = {
-  async createIssue({ title, body }) {
+  async createIssue({ title, body }, opts) {
     const issue_id = makeId();
     const issue: Issue = {
       issue_id,
@@ -76,7 +78,7 @@ const mockClient: KeeperClient = {
       created_at: new Date().toISOString(),
     };
     const store = readStore();
-    store[issue_id] = { issue, plan: synthesizePlan(issue), versions: 1 };
+    store[issue_id] = { issue, plan: synthesizePlan(issue, opts?.assignee), versions: 1 };
     writeStore(store);
     return { issue_id };
   },

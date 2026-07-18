@@ -21,6 +21,7 @@ import {
 const samuelAvatar = "https://api.builder.io/api/v1/image/assets/TEMP/15a001fa0d049362b83ad86d84c419cbf69c3ee1?width=40";
 
 function Sidebar() {
+  const navigate = useNavigate();
   return (
     <aside className="w-full flex-shrink-0 border-b border-gh-borderMuted bg-white lg:w-[336px] lg:border-b-0 lg:border-r">
       <div className="flex flex-col items-start gap-6 p-4">
@@ -46,6 +47,7 @@ function Sidebar() {
             </button>
             <button
               type="button"
+              onClick={() => navigate("/match")}
               className="rounded-md border border-[rgba(31,35,40,0.15)] bg-[#1F883D] px-3 py-1.5 text-sm font-semibold text-white shadow-[0_1px_0_0_rgba(31,35,40,0.04)] hover:brightness-95"
             >
               Upload Resume

@@ -1,4 +1,6 @@
-# Keeper — LoopHack 2026 (Backend)
+# Compass — LoopHack 2026 
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/24b47aa1-3d35-4edf-bb34-86ddb9009b7f" />
+
 
 An event-driven agent that turns **one** human-filed issue into a self-sustaining loop:
 recall → plan → assign → branch → merge → **scan → file its own new issues** → repeat.

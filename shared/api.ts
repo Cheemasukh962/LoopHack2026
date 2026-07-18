@@ -113,3 +113,32 @@ export interface Stats {
   plans_revised: number;
   branches_open: number;
 }
+
+/** GET /repo -> which real repo the loop is running on. */
+export interface RepoMeta {
+  mode: string; // "live-repo" | "seed" | "mock"
+  target: string | null;
+  html_url?: string;
+  dominant_dir?: string;
+  contributors?: number;
+  commits?: number;
+  files?: number;
+  fetched_at?: string;
+}
+
+/** GET /repo/people -> real contributors with their Nexla context score. */
+export interface RepoPerson {
+  login: string;
+  name: string;
+  contributions: number;
+  avatar_url: string;
+  html_url: string;
+  context_score: number;
+  module: string;
+}
+
+/** GET /sponsors -> per-sponsor live/local status. */
+export interface SponsorStatus {
+  data_source: { mode: string; target?: string };
+  sponsors: Record<string, { mode: string; data?: string; note?: string }>;
+}

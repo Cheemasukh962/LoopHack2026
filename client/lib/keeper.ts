@@ -14,6 +14,9 @@ import type {
   PhaseView,
   Plan,
   Provenance,
+  RepoMeta,
+  RepoPerson,
+  SponsorStatus,
   Stats,
 } from "@shared/api";
 
@@ -35,6 +38,10 @@ export interface KeeperClient {
   merge(id: string): Promise<void>;
   advanceImplementation(id: string): Promise<void>;
   failCi(id: string): Promise<void>;
+  getRepoMeta(): Promise<RepoMeta>;
+  getRepoPeople(): Promise<RepoPerson[]>;
+  getSponsors(): Promise<SponsorStatus>;
+  getAllEvents(): Promise<LoopEvent[]>;
 }
 
 /* --------------------------- helpers shared by both ------------------------- */
@@ -131,6 +138,10 @@ const httpClient: KeeperClient = {
     await post("ci.completed", { issue_id: id, status: "success" });
   },
   async failCi(id) { await post("ci.failed", { issue_id: id, run: "checkout-e2e" }); },
+  getRepoMeta: () => req<RepoMeta>("/repo"),
+  getRepoPeople: () => req<RepoPerson[]>("/repo/people"),
+  getSponsors: () => req<SponsorStatus>("/sponsors"),
+  getAllEvents: () => req<LoopEvent[]>("/events"),
 };
 
 /* ------------------------------- mock adapter ------------------------------ */
@@ -274,6 +285,20 @@ const mockClient: KeeperClient = {
     rec.events.push(evt(id, "phase.updated", { phase: "implementation", status: "active", detail: "Re-planned after CI failure" }));
     writeStore(store);
   },
+  async getRepoMeta() { return { mode: "mock", target: null }; },
+  async getRepoPeople() { return []; },
+  async getSponsors() {
+    return {
+      data_source: { mode: "mock (offline)" },
+      sponsors: {
+        nexla: { mode: "local", data: "seeded" },
+        pomerium: { mode: "local", note: "file-boundary + ≤5/hr cap" },
+        zero: { mode: "local", note: "tool discovery" },
+        claude: { mode: "fallback" },
+      },
+    };
+  },
+  async getAllEvents() { return Object.values(readStore()).flatMap((r) => r.events); },
 };
 
 /* --------------------------------- selector -------------------------------- */
@@ -311,6 +336,10 @@ export const keeper: KeeperClient = {
   merge: async (id) => (await impl()).merge(id),
   advanceImplementation: async (id) => (await impl()).advanceImplementation(id),
   failCi: async (id) => (await impl()).failCi(id),
+  getRepoMeta: async () => (await impl()).getRepoMeta(),
+  getRepoPeople: async () => (await impl()).getRepoPeople(),
+  getSponsors: async () => (await impl()).getSponsors(),
+  getAllEvents: async () => (await impl()).getAllEvents(),
 };
 
 /* ----------------------------- seeded demo card ---------------------------- */

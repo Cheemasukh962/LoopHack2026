@@ -3,6 +3,7 @@ import express, { type Express, type Request, type Response } from "express";
 import type { EventType, PersonRecord, PlanRecord, Store } from "./contract/index.js";
 import type { Gateway } from "./services/gateway.js";
 import { foldPhases } from "./services/phase-tracker.js";
+import type { RepoIngest } from "./github/repo.js";
 
 const personView = (person: PersonRecord) => ({
   person_id: person.person_id,
@@ -56,7 +57,7 @@ const issueSummary = (issueId: string, store: Store) => {
 const respondIssueNotFound = (res: Response) => res.status(404).json({ error: "Issue not found" });
 
 /** Serves the frozen frontend contract while keeping all mutation inside Gateway. */
-export const createServer = (store: Store, gateway: Gateway): Express => {
+export const createServer = (store: Store, gateway: Gateway, ingest?: RepoIngest | null): Express => {
   const app = express();
   app.use(express.json());
   app.use((_req, res, next) => {
@@ -65,6 +66,48 @@ export const createServer = (store: Store, gateway: Gateway): Express => {
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     if (_req.method === "OPTIONS") return res.sendStatus(204);
     next();
+  });
+
+  // Real repo the loop is running on (null → seeded fallback).
+  app.get("/api/v1/repo", (_req, res) => {
+    if (!ingest) return res.json({ mode: "seed", target: null });
+    res.json({
+      mode: "live-repo",
+      target: ingest.target,
+      html_url: ingest.html_url,
+      dominant_dir: ingest.dominantDir,
+      contributors: ingest.people.length,
+      commits: ingest.history.length,
+      files: ingest.blame.length,
+      fetched_at: ingest.fetched_at,
+    });
+  });
+  // Real contributors + their Nexla context score (the People/ownership explorer).
+  app.get("/api/v1/repo/people", (_req, res) => {
+    if (!ingest) return res.json([]);
+    const max = Math.max(1, ...ingest.people.map((p) => p.contributions));
+    res.json(ingest.people.map((p) => ({
+      login: p.login,
+      name: p.name,
+      contributions: p.contributions,
+      avatar_url: p.avatar_url,
+      html_url: p.html_url,
+      context_score: Number((p.contributions / max).toFixed(3)),
+      module: ingest.dominantDir,
+    })));
+  });
+  // Per-sponsor mode (live vs local) + the data source — powers the status badges.
+  app.get("/api/v1/sponsors", (_req, res) => {
+    const on = (v?: string) => Boolean(v && v.length);
+    res.json({
+      data_source: ingest ? { mode: "live-repo", target: ingest.target } : { mode: "seed" },
+      sponsors: {
+        nexla: { mode: on(process.env.NEXLA_API_KEY) ? "live" : "local", data: ingest ? "real GitHub Nexsets" : "seeded Nexsets" },
+        pomerium: { mode: on(process.env.POMERIUM_ISSUER) ? "live" : "local", note: "file-boundary + ≤5/hr cap enforced" },
+        zero: { mode: on(process.env.ZERO_API_URL) ? "live" : "local", note: "tool discovery" },
+        claude: { mode: (on(process.env.ANTHROPIC_API_KEY) || on(process.env.ANTHROPIC_BASE_URL)) ? "live" : "fallback" },
+      },
+    });
   });
 
   app.post("/api/v1/repos/connect", (req, res) => {

@@ -9,6 +9,12 @@ real **Keeper engine** (event bus + services + sponsor integrations) in [`backen
 `pnpm dev` runs both — you file one issue and watch the **real** loop run and file its own next issues,
 with Nexla, Pomerium, and Zero.xyz lighting up live as their events fire.
 
+**It runs on real data, not seed data.** On boot Keeper ingests a live GitHub repo
+(`TARGET_REPO`, default `facebook/react`) and turns it into the Nexset-shaped rows the loop
+consumes — so recall, routing, and scans use **real contributors, real commits, and real files**.
+File a bug and Keeper routes it to an actual top contributor (e.g. `sebmarkbage`, 1,939 commits),
+cites real PRs as prior art, and scopes a real file path.
+
 ## How it works
 
 ### What you do (the 60-second demo)
@@ -66,9 +72,10 @@ file more than 5 issues an hour. That's what makes an autonomous, write-capable 
 Keeper integrates all three sponsor platforms. Each connects through its official client/SDK using
 env-configured credentials, and falls back to a local implementation so the demo also runs fully offline.
 
-- **Nexla** — connected as the **context & recall layer**. A Nexla client authenticates with a service
-  key, and ownership/history are modelled as **Nexsets**, answering `whoHasContext(path)` and
-  `priorArt(query)` so each issue routes to the true code owner (blame outranks the résumé).
+- **Nexla** — connected as the **context & recall layer**, now serving **Nexsets built from a real
+  GitHub repo** (real contributors, commits, and files). It answers `whoHasContext(path)` and
+  `priorArt(query)` so each issue routes to the true code owner (blame outranks the résumé). A Nexla
+  API key flips it to the live Nexla cloud; see **/people** for the ownership map.
 - **Pomerium** — connected as the **write-authorization guardrail** (`@pomerium/js-sdk`). Every write
   (file-issue / branch / assign) is authorized through a Pomerium guard that enforces the plan's
   `file_boundary` and a ≤ 5-issues/hour filing cap, emitting an audit event on every decision.
@@ -88,6 +95,10 @@ pnpm dev                     # runs BOTH: web on :8080, engine on :8787
 ```
 
 Open the printed web URL (Vite falls back to `:8081` if `:8080` is busy), file an issue, and watch the loop.
+Browse **/people** for the real contributor ownership map and **/events** for the full live audit log.
+
+**Point it at any repo:** `TARGET_REPO=vercel/next.js pnpm dev` (add `GITHUB_TOKEN=…` in `backend/.env`
+to lift the 60-req/hr anonymous GitHub limit). The ingest is disk-cached under `backend/.cache/`.
 
 **No API keys required.** The engine runs the whole loop offline with a built-in prompt-aware fallback LLM,
 and all three sponsors fall back to local implementations. To upgrade to **real Claude**, drop your key into
@@ -110,7 +121,8 @@ host `backend/` (any Node host — it's an in-memory demo engine) and set `VITE_
 
 | Path | What's there |
 |---|---|
-| `client/` | **Compass** frontend — composer + feed (`Index`), live lifecycle (`AgentIssue`), human review (`ReviewIssue`); `lib/keeper.ts` (API adapter), `lib/loop.ts` (event → UI map) |
+| `client/` | **Compass** frontend — feed + composer (`Index`), live lifecycle (`AgentIssue`), people/ownership (`People`), audit log (`Events`); `lib/keeper.ts` (API adapter), `lib/loop.ts` (event → UI map) |
 | `shared/api.ts` | The frozen contract shared by client & engine |
 | `backend/` | The **Keeper engine** — event bus, store, services (`recall`/`locate`/`router`/`planner`/`decomposer`/`scanner`), API on `:8787`, and the Nexla / Pomerium / Zero.xyz integrations |
+| `backend/src/github/repo.ts` | **Real-data ingest** — turns a live GitHub repo into Nexset-shaped rows (disk-cached) |
 | `vercel.json` | Static SPA deploy config |

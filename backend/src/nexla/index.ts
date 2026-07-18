@@ -199,8 +199,18 @@ export class LocalNexla implements NexlaContext {
   async whoHasContext(
     path: string,
   ): Promise<{ person_id: string; score: number; why: string }[]> {
-    const ranked = this.ownership
-      .filter((r) => pathMatches(r.path, path))
+    let pool = this.ownership.filter((r) => pathMatches(r.path, path));
+    if (pool.length === 0) {
+      // No module matched (e.g. a thin/rate-limited ingest) — never leave it unassigned:
+      // fall back to the strongest overall contributors, one row per person.
+      const bestByPerson = new Map<string, OwnershipRow>();
+      for (const r of this.ownership) {
+        const cur = bestByPerson.get(r.person_id);
+        if (!cur || r.recency_weighted_blame > cur.recency_weighted_blame) bestByPerson.set(r.person_id, r);
+      }
+      pool = [...bestByPerson.values()];
+    }
+    const ranked = pool
       .map((r) => {
         const { score, basis } = contextScore(r);
         return { row: r, score, basis };
@@ -279,8 +289,11 @@ export class LocalNexla implements NexlaContext {
  * downstream changes because the shapes match. Auth is non-blocking so boot is never delayed,
  * and any failure degrades cleanly to the local Nexsets.
  */
-export async function createNexla(): Promise<LocalNexla> {
-  const local = new LocalNexla();
+export async function createNexla(
+  rows?: { ownership: OwnershipRow[]; blame: BlameRow[]; history: HistoryRow[] },
+): Promise<LocalNexla> {
+  const local = rows ? new LocalNexla(rows.ownership, rows.blame, rows.history) : new LocalNexla();
+  if (rows) console.info(`[nexla] serving REAL repo Nexsets (${rows.ownership.length} owners, ${rows.history.length} history rows)`);
   const apiKey = process.env.NEXLA_API_KEY;
   if (apiKey) {
     const client = new NexlaClient({ apiKey, apiUrl: process.env.NEXLA_API_URL });

@@ -26,6 +26,9 @@ import { makeLlm, makeGuard, makeZero } from "./integrations.js";
 // --- A round 2 (phase machine + self-correction) ---
 import { registerPhaseTracker } from "./services/phase-tracker.js";
 
+// --- Real data: ingest a live GitHub repo into Nexset-shaped rows ---
+import { ingestRepo } from "./github/repo.js";
+
 const hasLlmKey = () => Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_BASE_URL);
 
 /**
@@ -77,12 +80,19 @@ async function main() {
   const store = new InMemoryStore(seed as unknown as InMemoryStoreSeed);
   const bus = new InMemoryEventBus();
 
+  // Real data: ingest a live GitHub repo (TARGET_REPO, default facebook/react) into
+  // Nexset-shaped rows. Null if GitHub is unreachable → the seeded Nexsets are used.
+  const ingest = await ingestRepo();
+
   // Sponsor integrations (env-configured; safe to construct offline).
   const guard = makeGuard(store);          // Pomerium: file boundary + <=5/hr filing cap + audit
   const tools = makeZero(store);           // Zero.xyz: mid-loop tool discovery
   const llm = hasLlmKey() ? makeLlm() : fallbackLlm();
 
-  const nexla = await createNexla();       // Nexla ownership + history
+  // Nexla ownership + history — served from the REAL repo rows when available.
+  const nexla = await createNexla(
+    ingest ? { ownership: ingest.ownership, blame: ingest.blame, history: ingest.history } : undefined,
+  );
 
   // A — spine
   const gateway = createGateway(bus, store);
@@ -101,11 +111,12 @@ async function main() {
   registerPlanner({ bus, store, llm, nexla, zero: tools });
   registerDecomposer({ bus, store, llm, guard });
 
-  // A — the close (Loop 5)
-  const diff = readFileSync(new URL("./seed/staged-pr.diff", import.meta.url), "utf8");
+  // A — the close (Loop 5). Scan the REAL latest diff from the ingested repo when we have one.
+  const seededDiff = readFileSync(new URL("./seed/staged-pr.diff", import.meta.url), "utf8");
+  const diff = ingest && ingest.latestDiff && ingest.latestDiff.length > 40 ? ingest.latestDiff : seededDiff;
   registerScanner(bus, store, { llm, guard, tools, stagedDiff: diff });
 
-  const app = createServer(store, gateway);
+  const app = createServer(store, gateway, ingest);
   const port = Number(process.env.PORT ?? 8787);
   app.listen(port, () =>
     console.log(

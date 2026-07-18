@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import AgentIssue from "./pages/AgentIssue";
 import ReviewIssue from "./pages/ReviewIssue";
 import People from "./pages/People";
+import Team from "./pages/Team";
 import Events from "./pages/Events";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/layout/Layout";
@@ -26,6 +27,7 @@ const App = () => (
           <Route element={<Layout />}>
             <Route path="/" element={<Index />} />
             <Route path="/people" element={<People />} />
+            <Route path="/team" element={<Team />} />
             <Route path="/events" element={<Events />} />
             <Route path="/issue" element={<AgentIssue />} />
             <Route path="/issue/:id" element={<AgentIssue />} />

@@ -126,6 +126,17 @@ export interface RepoMeta {
   fetched_at?: string;
 }
 
+/** GET /people -> the résumé team (backend seed). */
+export interface Person {
+  person_id: string;
+  name: string;
+  github_handle: string;
+  cold_start: boolean;
+  context_scores: Record<string, number>;
+  resume_parsed: { skills: string[]; stacks: string[] };
+  repo_commits: number;
+}
+
 /** GET /repo/people -> real contributors with their Nexla context score. */
 export interface RepoPerson {
   login: string;

@@ -12,6 +12,7 @@ import type {
   IssueSummary,
   LoopEvent,
   PhaseView,
+  Person,
   Plan,
   Provenance,
   RepoMeta,
@@ -19,6 +20,14 @@ import type {
   SponsorStatus,
   Stats,
 } from "@shared/api";
+
+const DEFAULT_TEAM: Person[] = [
+  { person_id: "person_dana", name: "Dana Ibrahim", github_handle: "dana", cold_start: false, context_scores: { "src/http": 0.79 }, resume_parsed: { skills: ["TypeScript", "distributed systems", "incident response", "reliability"], stacks: ["Node.js", "Express", "PostgreSQL"] }, repo_commits: 428 },
+  { person_id: "person_marco", name: "Marco Chen", github_handle: "marco", cold_start: false, context_scores: { "src/auth": 0.78 }, resume_parsed: { skills: ["security", "authentication", "OAuth"], stacks: ["Node.js", "Redis", "Terraform"] }, repo_commits: 311 },
+  { person_id: "person_priya", name: "Priya Nair", github_handle: "priya", cold_start: false, context_scores: { infra: 0.76 }, resume_parsed: { skills: ["SRE", "Terraform", "AWS"], stacks: ["Terraform", "ECS", "CloudWatch"] }, repo_commits: 276 },
+  { person_id: "person_leo", name: "Leo Martin", github_handle: "leo", cold_start: false, context_scores: {}, resume_parsed: { skills: ["React", "accessibility", "product analytics"], stacks: ["React", "Vite", "Playwright"] }, repo_commits: 163 },
+  { person_id: "person_sam", name: "Sam Okoro", github_handle: "sam", cold_start: true, context_scores: {}, resume_parsed: { skills: ["security", "authentication", "OAuth", "reliability", "SRE"], stacks: ["Node.js", "Python"] }, repo_commits: 1 },
+];
 
 const CURRENT_USER = {
   name: "samuelalake",
@@ -42,6 +51,7 @@ export interface KeeperClient {
   getRepoPeople(): Promise<RepoPerson[]>;
   getSponsors(): Promise<SponsorStatus>;
   getAllEvents(): Promise<LoopEvent[]>;
+  getTeam(): Promise<Person[]>;
 }
 
 /* --------------------------- helpers shared by both ------------------------- */
@@ -142,6 +152,12 @@ const httpClient: KeeperClient = {
   getRepoPeople: () => req<RepoPerson[]>("/repo/people"),
   getSponsors: () => req<SponsorStatus>("/sponsors"),
   getAllEvents: () => req<LoopEvent[]>("/events"),
+  async getTeam() {
+    try {
+      const team = await req<Person[]>("/people");
+      return Array.isArray(team) && team.length ? team : DEFAULT_TEAM;
+    } catch { return DEFAULT_TEAM; }
+  },
 };
 
 /* ------------------------------- mock adapter ------------------------------ */
@@ -299,6 +315,7 @@ const mockClient: KeeperClient = {
     };
   },
   async getAllEvents() { return Object.values(readStore()).flatMap((r) => r.events); },
+  async getTeam() { return DEFAULT_TEAM; },
 };
 
 /* --------------------------------- selector -------------------------------- */
@@ -340,6 +357,7 @@ export const keeper: KeeperClient = {
   getRepoPeople: async () => (await impl()).getRepoPeople(),
   getSponsors: async () => (await impl()).getSponsors(),
   getAllEvents: async () => (await impl()).getAllEvents(),
+  getTeam: async () => (await impl()).getTeam(),
 };
 
 /* ----------------------------- seeded demo card ---------------------------- */

@@ -74,7 +74,7 @@ env-configured credentials, and falls back to a local implementation so the demo
   right tool for a detected signal (e.g. Terraform in the diff → an IaC scanner).
 
 Set `NEXLA_API_KEY`, `POMERIUM_ISSUER` / `POMERIUM_AUDIENCE`, `ZERO_API_URL`, and `ANTHROPIC_API_KEY`
-to run against the live services; leave them unset to use the built-in local fallbacks.
+to run against the live services; leave them unset to use the built-in local fallbacks when there is no API key.
 
 ## Run locally
 
